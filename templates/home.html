@@ -1,0 +1,1113 @@
+{% extends 'base.html' %}
+
+{% block title %}ホーム{% endblock %}
+
+{% block content %}
+<div class="home-dashboard mx-auto max-w-7xl">
+  <section class="panel">
+    <div class="section-title-row">
+      <h2 class="text-xl font-black text-slate-950">今日の学習状況</h2>
+      <div class="today-actions">
+        <span>{{ today_context.date_label }}</span>
+        <button type="button" class="goal-edit-button" data-open-goal-modal>目標を設定</button>
+      </div>
+    </div>
+    <div class="mt-5 grid divide-x divide-slate-200 md:grid-cols-4">
+      <div class="today-card">
+        <span class="today-icon green">🔥</span>
+        <p>連続学習日数</p>
+        <strong>{{ today_context.streak }}<small>日</small></strong>
+        <em>{% if today_context.streak > 0 %}継続中{% else %}今日から開始{% endif %}</em>
+      </div>
+      <div class="today-card">
+        <span class="today-icon green">◷</span>
+        <p>今日の学習時間</p>
+        <strong>{{ today_context.minutes }}<small>分</small></strong>
+        <em>{% if today_context.minute_goal %}目標：{{ today_context.minute_goal }}分{% else %}目標未設定{% endif %}</em>
+        <i class="meter"><b style="width: {% if today_context.minute_goal %}{{ [100, (today_context.minutes / today_context.minute_goal * 100)|round]|min }}{% else %}0{% endif %}%;"></b></i>
+      </div>
+      <div class="today-card">
+        <span class="today-icon blue">✎</span>
+        <p>今日解いた問題</p>
+        <strong>{{ today_context.questions }}<small>問</small></strong>
+        <em>{% if today_context.question_goal %}目標：{{ today_context.question_goal }}問{% else %}目標未設定{% endif %}</em>
+        <i class="meter blue"><b style="width: {% if today_context.question_goal %}{{ [100, (today_context.questions / today_context.question_goal * 100)|round]|min }}{% else %}0{% endif %}%;"></b></i>
+      </div>
+      <div class="today-card">
+        <span class="today-icon amber">◎</span>
+        <p>今日の問題正答率</p>
+        <strong>{{ today_context.accuracy }}<small>%</small></strong>
+        <em>{% if today_context.questions > 0 %}今日の演習結果{% else %}まだ未演習{% endif %}</em>
+      </div>
+    </div>
+  </section>
+
+  <div class="home-action-grid mt-6 grid gap-6 xl:grid-cols-[1.9fr_1fr]">
+    <section class="panel review-panel">
+      <div class="panel-head">
+        <h2>復習すべき項目</h2>
+      </div>
+      {% if has_enough_history %}
+        <div class="mt-5 grid gap-6 lg:grid-cols-[1fr_310px]">
+          <div class="flex gap-5">
+            <span class="review-main-icon">⌘</span>
+            <div class="min-w-0 flex-1">
+              <h3>{{ practice_recommendation.category }}を重点的に復習しましょう</h3>
+              <p class="mt-2 text-sm font-bold text-slate-600">
+                {% if practice_recommendation.rate is not none %}
+                  問題正答率が{{ practice_recommendation.rate }}%のカテゴリです。
+                {% else %}
+                  理解度が低い用語が多いカテゴリです。
+                {% endif %}
+              </p>
+              <div class="mt-5 overflow-hidden rounded-2xl border border-orange-100 bg-white">
+                {% for item in review_items %}
+                  <div class="review-row">
+                    <span>{{ item.icon }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <b>{{ item.count }}{{ item.unit }}</b>
+                  </div>
+                {% endfor %}
+              </div>
+              <a href="{{ url_for('flashcards', preset='recommended', learning_mode='review', limit=20, random=1, direction='term_to_meaning') }}" class="primary-orange mt-6">復習を開始する <span>›</span></a>
+            </div>
+          </div>
+          <div class="priority-box">
+            <strong>復習のおすすめ順</strong>
+            <div class="mt-4 space-y-4">
+              {% for item in weak_categories %}
+                <div class="priority-row">
+                  <b>{{ loop.index }}</b>
+                  <span>{{ item.name }}</span>
+                  <em>{{ '★' * item.stars }}{{ '☆' * (5 - item.stars) }}</em>
+                </div>
+              {% endfor %}
+            </div>
+            <a href="{{ url_for('statistics') }}">すべての復習推奨を確認</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="review-empty-state mt-5">
+          <span>◌</span>
+          <strong>まだ復習データがありません。</strong>
+          <p>問題演習や用語学習を進めると、ここに優先して復習すべき内容が表示されます。</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="panel resume-panel">
+      <div class="panel-head">
+        <h2>学習を再開する</h2>
+      </div>
+      {% if resume_card %}
+        <div class="resume-card mt-5">
+          <span>{{ resume_card.mode_label }}</span>
+          <strong>{{ resume_card.category }}：{{ resume_card.answered }}/{{ resume_card.total }}問</strong>
+          <div class="mt-5 flex items-center gap-3">
+            <i><b style="width: {{ resume_card.rate }}%;"></b></i>
+            <em>{{ resume_card.rate }}%</em>
+          </div>
+          <a href="{{ resume_card.url }}" class="primary-purple mt-6">続きから始める <span>›</span></a>
+        </div>
+      {% else %}
+        <div class="resume-card resume-empty mt-5">
+          <span>待機中</span>
+          <strong>中断されている学習はありません</strong>
+          <p>新しく学習を始める場合は、下のおすすめやクイックスタートから開始できます。</p>
+          <a href="{{ url_for('practice_settings', mode='normal') }}" class="primary-purple mt-6">問題演習を始める <span>›</span></a>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="home-recommend-row mt-6">
+    <section class="home-recommend-section panel">
+      <div>
+        <h2 class="text-xl font-black text-slate-950">本日のおすすめ</h2>
+        <p class="mt-1 text-sm font-bold text-slate-500">今の学習状況から、今日取り組む内容を選びました。</p>
+      </div>
+      <div class="home-recommend-grid mt-5 grid gap-5 xl:grid-cols-2">
+        <article class="recommend-card green">
+          <div class="recommend-head">
+            <span>▣</span>
+            <strong>用語学習のおすすめ</strong>
+            <em>今日の提案</em>
+          </div>
+          <h3>「{{ term_recommendation.keyword }}」を復習しましょう</h3>
+          <p>{{ term_recommendation.reason }}</p>
+          <div class="recommend-body">
+            <div>
+              <strong>{{ term_recommendation.goal }}<small>語</small></strong>
+            </div>
+            <div class="mini-chart green">
+              <i style="height: 46%;"></i><i style="height: 62%;"></i><i style="height: 54%;"></i><i style="height: 49%;"></i><i style="height: 38%;"></i>
+            </div>
+          </div>
+          <a href="{{ term_recommendation.url }}" class="primary-green">用語学習を始める <span>›</span></a>
+        </article>
+
+        <article class="recommend-card blue">
+          <div class="recommend-head">
+            <span>✎</span>
+            <strong>問題演習のおすすめ</strong>
+            <em>今日の提案</em>
+          </div>
+          <h3>{{ practice_recommendation.category }}を{{ practice_recommendation.goal }}問解きましょう</h3>
+          <p>
+            {% if practice_recommendation.rate is not none %}
+              {{ practice_recommendation.reason }} 正答率は{{ practice_recommendation.rate }}%です。
+            {% else %}
+              {{ practice_recommendation.reason }}
+            {% endif %}
+          </p>
+          <div class="recommend-body">
+            <div>
+              <strong>{{ practice_recommendation.goal }}<small>問</small></strong>
+            </div>
+            <div class="mini-chart blue">
+              <i style="height: 58%;"></i><i style="height: 54%;"></i><i style="height: 43%;"></i><i style="height: 49%;"></i><i style="height: 36%;"></i>
+            </div>
+          </div>
+          <a href="{{ practice_recommendation.url }}" class="primary-blue">問題演習を始める <span>›</span></a>
+        </article>
+      </div>
+    </section>
+
+    <section class="quick-start-section panel">
+      <div class="quick-start-head">
+        <h2>クイックスタート</h2>
+        <p>すぐに学習を始める入口です。</p>
+      </div>
+      <div class="quick-start-grid">
+        <a href="{{ url_for('flashcard_settings') }}" class="quick-link green"><span>▣</span><strong>用語学習</strong><em>カードで覚える</em><b>›</b></a>
+        <a href="{{ url_for('practice_settings', mode='normal') }}" class="quick-link blue"><span>✎</span><strong>問題演習</strong><em>問題を解く</em><b>›</b></a>
+        <a href="{{ url_for('practice_settings', mode='exam') }}" class="quick-link purple"><span>◎</span><strong>模試</strong><em>実力を試す</em><b>›</b></a>
+      </div>
+    </section>
+  </div>
+
+  <div class="goal-modal" data-goal-modal aria-hidden="true">
+    <div class="goal-modal-backdrop" data-close-goal-modal></div>
+    <form method="post" action="{{ url_for('update_goals') }}" class="goal-modal-card">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="goal-modal-head">
+        <div>
+          <h2>今日の目標を設定</h2>
+          <p>空欄にすると未設定に戻ります。</p>
+        </div>
+        <button type="button" data-close-goal-modal>×</button>
+      </div>
+      <label>
+        <span>1日の学習時間</span>
+        <input type="number" name="daily_minute_goal" min="1" max="600" value="{{ today_context.minute_goal or '' }}" placeholder="例：60" />
+        <em>分</em>
+      </label>
+      <label>
+        <span>1日の問題数</span>
+        <input type="number" name="daily_question_goal" min="1" max="300" value="{{ today_context.question_goal or '' }}" placeholder="例：30" />
+        <em>問</em>
+      </label>
+      <label>
+        <span>1日の用語数</span>
+        <input type="number" name="daily_term_goal" min="1" max="500" value="{{ today_context.term_goal or '' }}" placeholder="例：20" />
+        <em>語</em>
+      </label>
+      <button type="submit" class="goal-save-button">保存する</button>
+    </form>
+  </div>
+
+</div>
+
+<style>
+  .home-dashboard {
+    display: flex;
+    flex-direction: column;
+  }
+  .home-recommend-row {
+    order: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 304px;
+    gap: 14px;
+    align-items: stretch;
+  }
+  .home-action-grid {
+    order: 3;
+  }
+  .panel {
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 22px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .panel-head h2 {
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 950;
+  }
+  .panel-head span {
+    border-radius: 999px;
+    background: #ffedd5;
+    padding: 7px 12px;
+    color: #ea580c;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .today-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title-row span {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 7px 12px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .goal-edit-button {
+    border-radius: 10px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    padding: 7px 12px;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .today-card {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 6px 18px;
+    padding: 20px 28px;
+    align-items: center;
+  }
+  .today-icon {
+    grid-row: span 4;
+    display: inline-flex;
+    width: 58px;
+    height: 58px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 25px;
+    font-weight: 950;
+  }
+  .today-icon.green { background: #ecfdf5; color: #059669; }
+  .today-icon.blue { background: #eff6ff; color: #2563eb; }
+  .today-icon.amber { background: #fff7ed; color: #ea580c; }
+  .today-card p,
+  .today-card em {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 900;
+    font-style: normal;
+  }
+  .today-card strong {
+    color: #0f172a;
+    font-size: 34px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .today-card small {
+    margin-left: 4px;
+    font-size: 15px;
+  }
+  .meter {
+    display: block;
+    width: 140px;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #dbe3ef;
+  }
+  .meter b {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #059669;
+  }
+  .meter.blue b { background: #2563eb; }
+  .review-panel {
+    background: linear-gradient(135deg, #fff7ed 0%, #fff 62%);
+  }
+  .review-main-icon {
+    display: inline-flex;
+    width: 84px;
+    height: 84px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #fed7aa;
+    color: #ea580c;
+    font-size: 38px;
+    font-weight: 950;
+  }
+  .review-panel h3,
+  .recommend-card h3 {
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+  }
+  .review-row {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 13px 16px;
+    border-bottom: 1px solid #ffedd5;
+  }
+  .review-row:last-child { border-bottom: 0; }
+  .review-row span {
+    color: #f97316;
+    font-size: 20px;
+    font-weight: 950;
+  }
+  .review-row strong,
+  .review-row b {
+    color: #334155;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .review-empty-state {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+    border: 1px dashed #cbd5e1;
+    border-radius: 16px;
+    background: #f8fafc;
+    padding: 30px 18px;
+    text-align: center;
+  }
+  .review-empty-state span {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 24px;
+    font-weight: 950;
+  }
+  .review-empty-state strong {
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .review-empty-state p {
+    max-width: 520px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1.7;
+  }
+  .priority-box {
+    border-radius: 16px;
+    border: 1px solid #fed7aa;
+    background: rgba(255, 255, 255, .72);
+    padding: 18px;
+  }
+  .priority-box > strong {
+    color: #ea580c;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .priority-row {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .priority-row b {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #f97316;
+    color: #fff;
+    font-size: 12px;
+  }
+  .priority-row span,
+  .priority-row em,
+  .priority-box a {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 950;
+    font-style: normal;
+  }
+  .priority-row em { color: #f97316; }
+  .priority-box a {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+    border-radius: 12px;
+    border: 1px solid #fed7aa;
+    padding: 11px;
+    color: #ea580c;
+  }
+  .primary-orange,
+  .primary-green,
+  .primary-blue,
+  .primary-purple {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 13px 18px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 950;
+  }
+  .primary-orange { max-width: 340px; background: #f97316; }
+  .primary-green { background: #059669; }
+  .primary-blue { background: #2563eb; }
+  .primary-purple { background: #7c3aed; }
+  .primary-orange span,
+  .primary-green span,
+  .primary-blue span,
+  .primary-purple span {
+    margin-left: auto;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .resume-panel {
+    background: linear-gradient(135deg, #faf5ff 0%, #fff 70%);
+  }
+  .resume-card {
+    border-radius: 16px;
+    border: 1px solid #e9d5ff;
+    background: #fff;
+    padding: 20px;
+  }
+  .resume-card > span {
+    display: inline-flex;
+    border-radius: 9px;
+    background: #ede9fe;
+    padding: 6px 10px;
+    color: #7c3aed;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .resume-card strong {
+    display: block;
+    margin-top: 18px;
+    color: #0f172a;
+    font-size: 19px;
+    font-weight: 950;
+  }
+  .resume-card p {
+    margin-top: 12px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.8;
+  }
+  .resume-empty {
+    background: rgba(255, 255, 255, .72);
+  }
+  .resume-card i {
+    flex: 1;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .resume-card i b {
+    display: block;
+    height: 100%;
+    background: #7c3aed;
+  }
+  .resume-card em {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 950;
+    font-style: normal;
+  }
+  .recommend-card,
+  .quick-card {
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 18px;
+  }
+  .home-recommend-grid {
+    align-items: stretch;
+  }
+  .recommend-card {
+    display: flex;
+    min-height: 276px;
+    flex-direction: column;
+  }
+  .recommend-card.green { background: linear-gradient(135deg, #f0fdf4 0%, #fff 70%); }
+  .recommend-card.blue { background: linear-gradient(135deg, #eff6ff 0%, #fff 70%); }
+  .recommend-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .recommend-head span {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .recommend-card.green .recommend-head span { background: #dcfce7; color: #059669; }
+  .recommend-card.blue .recommend-head span { background: #dbeafe; color: #2563eb; }
+  .recommend-head strong {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  .recommend-head em {
+    margin-left: auto;
+    border-radius: 999px;
+    background: #e0f2fe;
+    padding: 5px 9px;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+    font-style: normal;
+  }
+  .recommend-card.green .recommend-head em {
+    background: #dcfce7;
+    color: #059669;
+  }
+  .recommend-card p {
+    margin-top: 8px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.7;
+  }
+  .recommend-body {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 18px;
+    align-items: end;
+    margin: auto 0 18px;
+    padding-top: 18px;
+  }
+  .recommend-body > div:first-child {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .75);
+    padding: 16px;
+  }
+  .recommend-body span {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .recommend-body strong {
+    display: block;
+    margin-top: 0;
+    color: #059669;
+    font-size: 32px;
+    font-weight: 950;
+  }
+  .recommend-card.blue .recommend-body strong { color: #2563eb; }
+  .recommend-body small {
+    margin-left: 3px;
+    font-size: 14px;
+  }
+  .recommend-body em {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 850;
+  }
+  .mini-chart {
+    display: flex;
+    height: 90px;
+    align-items: end;
+    gap: 10px;
+    border-bottom: 2px solid #dbe3ef;
+  }
+  .mini-chart i {
+    display: block;
+    width: 18px;
+    border-radius: 8px 8px 0 0;
+    background: #10b981;
+  }
+  .mini-chart.blue i { background: #3b82f6; }
+  .quick-start-section {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+  }
+  .quick-start-head h2,
+  .quick-card h2 {
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+  }
+  .quick-start-head p {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .quick-start-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .quick-link {
+    position: relative;
+    display: grid;
+    grid-template-columns: 46px 1fr 20px;
+    gap: 12px;
+    align-items: center;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 14px;
+  }
+  .quick-link.green { background: #f0fdf4; }
+  .quick-link.blue { background: #eff6ff; }
+  .quick-link.purple { background: #faf5ff; }
+  .quick-link span {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 22px;
+    font-weight: 950;
+  }
+  .quick-link.green span { color: #059669; }
+  .quick-link.blue span { color: #2563eb; }
+  .quick-link.purple span { color: #7c3aed; }
+  .quick-link strong,
+  .quick-link em {
+    grid-column: 2;
+    min-width: 0;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 950;
+    font-style: normal;
+  }
+  .quick-link strong {
+    grid-row: 1;
+    align-self: end;
+  }
+  .quick-link em {
+    grid-row: 2;
+    align-self: start;
+    margin-top: -6px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: normal;
+  }
+  .quick-link b {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    color: #2563eb;
+    font-size: 26px;
+    font-weight: 600;
+  }
+  .goal-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    place-items: center;
+    padding: 24px;
+  }
+  .goal-modal.is-open {
+    display: grid;
+  }
+  .goal-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, .34);
+    backdrop-filter: blur(3px);
+  }
+  .goal-modal-card {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 14px;
+    width: min(460px, 100%);
+    border: 1px solid #dbe3ef;
+    border-radius: 18px;
+    background: #fff;
+    padding: 22px;
+    box-shadow: 0 24px 70px -35px rgba(15, 23, 42, .75);
+  }
+  .goal-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .goal-modal-head h2 {
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+  }
+  .goal-modal-head p {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .goal-modal-head button {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .goal-modal-card label {
+    display: grid;
+    grid-template-columns: 1fr 160px 32px;
+    gap: 10px;
+    align-items: center;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .goal-modal-card input {
+    border: 1px solid #dbe3ef;
+    border-radius: 11px;
+    padding: 10px 12px;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+  }
+  .goal-modal-card label em {
+    color: #64748b;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 900;
+  }
+  .goal-save-button {
+    margin-top: 4px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    padding: 12px 16px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  @media (min-width: 1024px) {
+    .home-dashboard {
+      display: flex !important;
+      flex-direction: column !important;
+      max-width: 80rem !important;
+    }
+    .home-dashboard > section,
+    .home-dashboard > div {
+      grid-column: auto !important;
+      grid-row: auto !important;
+    }
+    .home-dashboard .panel {
+      padding: 12px !important;
+      border-radius: 12px !important;
+    }
+    .home-dashboard > section:first-child {
+      min-height: 0;
+    }
+    .home-dashboard > section:first-child > span {
+      padding: 9px 14px !important;
+      border-radius: 10px !important;
+      font-size: 12px !important;
+    }
+    .home-dashboard .mt-7,
+    .home-dashboard .mt-6 {
+      margin-top: 10px !important;
+    }
+    .home-dashboard .mt-5 {
+      margin-top: 8px !important;
+    }
+    .home-dashboard .gap-6,
+    .home-dashboard .gap-5 {
+      gap: 10px !important;
+    }
+    .home-action-grid {
+      grid-template-columns: minmax(0, 1.85fr) minmax(280px, .9fr) !important;
+    }
+    .home-recommend-row {
+      grid-template-columns: minmax(0, 1fr) 286px !important;
+      gap: 10px !important;
+    }
+    .home-recommend-section > .grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    }
+    .today-card {
+      grid-template-columns: 50px 1fr !important;
+      gap: 4px 12px !important;
+      min-height: 90px;
+      padding: 8px 16px !important;
+    }
+    .today-icon {
+      width: 46px !important;
+      height: 46px !important;
+      font-size: 20px !important;
+    }
+    .today-card p,
+    .today-card em {
+      font-size: 12px !important;
+    }
+    .today-card strong {
+      font-size: 28px !important;
+    }
+    .today-card small {
+      font-size: 13px !important;
+    }
+    .meter {
+      width: 110px !important;
+      height: 5px !important;
+    }
+    .panel-head h2,
+    .home-recommend-section h2 {
+      font-size: 18px !important;
+      line-height: 1.3 !important;
+    }
+    .section-title-row span {
+      padding: 6px 10px !important;
+      font-size: 12px !important;
+    }
+  .panel-head span {
+      padding: 5px 9px !important;
+      font-size: 11px !important;
+    }
+    .review-main-icon {
+      width: 58px !important;
+      height: 58px !important;
+      font-size: 25px !important;
+    }
+    .review-panel .mt-5.grid {
+      grid-template-columns: minmax(0, 1fr) 250px !important;
+      gap: 12px !important;
+    }
+    .review-panel .flex.gap-5 {
+      gap: 14px !important;
+    }
+    .review-panel h3,
+    .recommend-card h3 {
+      font-size: 16px !important;
+      line-height: 1.45 !important;
+    }
+    .review-panel p,
+    .recommend-card p {
+      font-size: 12px !important;
+      line-height: 1.55 !important;
+    }
+    .review-row {
+      grid-template-columns: 26px 1fr auto !important;
+      gap: 8px !important;
+      padding: 7px 10px !important;
+    }
+    .review-row span {
+      font-size: 16px !important;
+    }
+    .review-row strong,
+    .review-row b {
+      font-size: 12px !important;
+    }
+    .priority-box {
+      padding: 12px !important;
+      border-radius: 12px !important;
+    }
+    .priority-row {
+      gap: 8px !important;
+    }
+    .priority-box .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+      margin-top: 10px !important;
+    }
+    .priority-row span,
+    .priority-row em,
+    .priority-box a {
+      font-size: 12px !important;
+    }
+    .priority-box a {
+      margin-top: 12px !important;
+      padding: 8px !important;
+    }
+    .primary-orange,
+    .primary-green,
+    .primary-blue,
+    .primary-purple {
+      min-height: 34px;
+      padding: 8px 12px !important;
+      border-radius: 10px !important;
+      font-size: 13px !important;
+    }
+    .primary-orange span,
+    .primary-green span,
+    .primary-blue span,
+    .primary-purple span {
+      font-size: 18px !important;
+    }
+    .resume-card {
+      padding: 13px !important;
+      border-radius: 12px !important;
+    }
+    .resume-card strong {
+      margin-top: 12px !important;
+      font-size: 16px !important;
+      line-height: 1.5 !important;
+    }
+    .resume-card p {
+      margin-top: 8px !important;
+      font-size: 12px !important;
+      line-height: 1.6 !important;
+    }
+    .recommend-card,
+    .quick-card {
+      padding: 10px !important;
+      border-radius: 12px !important;
+    }
+    .recommend-card {
+      min-height: 238px !important;
+    }
+    .home-recommend-section > div:first-child p {
+      margin-top: 2px !important;
+      font-size: 12px !important;
+    }
+    .recommend-head {
+      gap: 8px !important;
+      margin-bottom: 10px !important;
+    }
+    .recommend-head span {
+      width: 28px !important;
+      height: 28px !important;
+      border-radius: 8px !important;
+      font-size: 15px !important;
+    }
+    .recommend-head strong {
+      font-size: 14px !important;
+    }
+    .recommend-head em {
+      padding: 4px 8px !important;
+      font-size: 11px !important;
+    }
+    .recommend-body {
+      grid-template-columns: 92px 1fr !important;
+      gap: 12px !important;
+      margin: auto 0 8px !important;
+      padding-top: 9px !important;
+    }
+    .recommend-body > div:first-child {
+      padding: 10px !important;
+      border-radius: 10px !important;
+    }
+    .recommend-body strong {
+      margin-top: 6px !important;
+      font-size: 26px !important;
+    }
+    .mini-chart {
+      height: 46px !important;
+      gap: 7px !important;
+    }
+    .mini-chart i {
+      width: 12px !important;
+      border-radius: 5px 5px 0 0 !important;
+    }
+    .quick-card h2 {
+      font-size: 16px !important;
+    }
+    .quick-start-section {
+      grid-template-columns: 1fr !important;
+      align-content: start !important;
+      gap: 10px !important;
+    }
+    .quick-start-head h2 {
+      font-size: 16px !important;
+      line-height: 1.3 !important;
+    }
+    .quick-start-head p {
+      font-size: 11px !important;
+      line-height: 1.45 !important;
+    }
+    .quick-start-grid {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+    }
+    .quick-link {
+      grid-template-columns: 34px minmax(0, 1fr) 16px !important;
+      grid-template-rows: auto auto !important;
+      gap: 9px !important;
+      margin-top: 0 !important;
+      padding: 8px !important;
+      border-radius: 10px !important;
+    }
+    .quick-link span {
+      width: 34px !important;
+      height: 34px !important;
+      border-radius: 10px !important;
+      font-size: 17px !important;
+    }
+    .quick-link strong {
+      grid-column: 2 !important;
+      grid-row: 1 !important;
+      font-size: 13px !important;
+      line-height: 1.25 !important;
+    }
+    .quick-link em {
+      grid-column: 2 !important;
+      grid-row: 2 !important;
+      font-size: 11px !important;
+      line-height: 1.35 !important;
+      white-space: normal !important;
+    }
+    .quick-link b {
+      grid-column: 3 !important;
+      grid-row: 1 / 3 !important;
+      font-size: 20px !important;
+    }
+  }
+</style>
+<script>
+  const goalModal = document.querySelector('[data-goal-modal]');
+  document.querySelectorAll('[data-open-goal-modal]').forEach((button) => {
+    button.addEventListener('click', () => {
+      goalModal?.classList.add('is-open');
+      goalModal?.setAttribute('aria-hidden', 'false');
+    });
+  });
+  document.querySelectorAll('[data-close-goal-modal]').forEach((button) => {
+    button.addEventListener('click', () => {
+      goalModal?.classList.remove('is-open');
+      goalModal?.setAttribute('aria-hidden', 'true');
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}フラッシュカード結果{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm md:p-8">
+    <p class="text-sm font-bold text-emerald-700">フラッシュカード学習</p>
+    <h1 class="mt-2 text-3xl font-bold text-slate-950">学習お疲れさまでした！</h1>
+    <p id="result-range" class="mt-2 text-sm font-semibold text-slate-500">今回の学習結果です。</p>
+
+    <div class="mt-8 grid gap-4 md:grid-cols-4">
+      <div class="result-tile">
+        <span>学習枚数</span>
+        <strong id="result-total">0</strong>
+      </div>
+      <div class="result-tile green">
+        <span>わかった</span>
+        <strong id="result-mastered">0</strong>
+      </div>
+      <div class="result-tile amber">
+        <span>あいまい</span>
+        <strong id="result-ambiguous">0</strong>
+      </div>
+      <div class="result-tile rose">
+        <span>わからなかった</span>
+        <strong id="result-weak">0</strong>
+      </div>
+    </div>
+
+    <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div class="flex items-center justify-between text-sm font-bold text-slate-700">
+        <span>理解できた割合</span>
+        <span id="result-rate">0%</span>
+      </div>
+      <div class="mt-3 h-3 overflow-hidden rounded-full bg-white">
+        <div id="result-rate-bar" class="h-full rounded-full bg-emerald-600" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <a href="{{ url_for('flashcards') }}?preset=recommended&learning_mode=daily_recommendation&limit=20&random=1&direction=term_to_meaning" class="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-6 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100">もう一度おすすめを解く</a>
+      <a href="{{ url_for('flashcard_settings') }}" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">メニューへ戻る</a>
+      <a href="{{ url_for('big_categories') }}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">用語学習トップへ</a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .result-tile {
+    border-radius: 16px;
+    background: #f8fafc;
+    padding: 20px;
+  }
+  .result-tile.green { background: #ecfdf5; }
+  .result-tile.amber { background: #fffbeb; }
+  .result-tile.rose { background: #fff1f2; }
+  .result-tile span {
+    font-size: 12px;
+    font-weight: 800;
+    color: #64748b;
+  }
+  .result-tile strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 34px;
+    line-height: 1;
+    color: #0f172a;
+  }
+</style>
+
+<script>
+  const result = JSON.parse(sessionStorage.getItem('flashcardResult') || '{}');
+  const total = Number(result.total || 0);
+  const mastered = Number(result.mastered || 0);
+  const ambiguous = Number(result.ambiguous || 0);
+  const weak = Number(result.weak || 0);
+  const rate = total ? Math.round((mastered / total) * 100) : 0;
+
+  document.querySelector('#result-total').textContent = total;
+  document.querySelector('#result-mastered').textContent = mastered;
+  document.querySelector('#result-ambiguous').textContent = ambiguous;
+  document.querySelector('#result-weak').textContent = weak;
+  document.querySelector('#result-rate').textContent = `${rate}%`;
+  document.querySelector('#result-rate-bar').style.width = `${rate}%`;
+  if (result.rangeLabel) {
+    document.querySelector('#result-range').textContent = result.rangeLabel;
+  }
+</script>
+{% endblock %}

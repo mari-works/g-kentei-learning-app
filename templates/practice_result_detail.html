@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+
+{% block title %}結果詳細{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <p class="text-sm font-bold uppercase tracking-[0.22em] text-slate-400">結果詳細</p>
+        <h1 class="mt-2 text-3xl font-bold text-slate-950">解説を確認</h1>
+        <p class="mt-2 text-sm text-slate-600">表示方法を切り替えて、回答内容と解説を確認できます。</p>
+      </div>
+      <a href="{{ url_for('practice_result') }}" class="inline-flex w-fit items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">結果へ戻る</a>
+    </div>
+
+    <div class="mt-6 grid gap-3 md:grid-cols-4">
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p class="text-xs font-bold text-slate-500">正答率</p>
+        <p class="mt-1 text-2xl font-bold text-slate-950">{{ summary.accuracy }}%</p>
+      </div>
+      <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+        <p class="text-xs font-bold text-emerald-700">正解</p>
+        <p class="mt-1 text-2xl font-bold text-emerald-800">{{ summary.correct }}問</p>
+      </div>
+      <div class="rounded-xl border border-orange-200 bg-orange-50 p-4">
+        <p class="text-xs font-bold text-orange-700">不正解</p>
+        <p class="mt-1 text-2xl font-bold text-orange-800">{{ summary.incorrect }}問</p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-bold text-slate-500">未回答</p>
+        <p class="mt-1 text-2xl font-bold text-slate-800">{{ summary.unanswered }}問</p>
+      </div>
+    </div>
+
+    <div class="mt-7 inline-grid w-full gap-2 rounded-2xl bg-slate-100 p-2 sm:w-auto sm:grid-cols-2">
+      <button type="button" class="result-view-tab {% if active_view == 'number' %}is-active{% endif %}" data-result-view-button="number">問題番号から見る</button>
+      <button type="button" class="result-view-tab {% if active_view == 'list' %}is-active{% endif %}" data-result-view-button="list">リストから見る</button>
+    </div>
+  </section>
+
+  <section data-result-view-panel="number" class="mt-6 {% if active_view != 'number' %}hidden{% endif %}">
+    <div class="grid gap-6 lg:grid-cols-[420px_1fr]">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-bold text-slate-950">問題番号から見る</h2>
+          <div class="flex flex-wrap gap-2 text-xs font-bold">
+            <span class="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">正解</span>
+            <span class="rounded-lg bg-orange-50 px-2 py-1 text-orange-700">不正解</span>
+            <span class="rounded-lg bg-slate-100 px-2 py-1 text-slate-600">未回答</span>
+          </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-6">
+          {% for item in details %}
+            <a href="{{ url_for('practice_result_detail', number=item.number, status=status_filter, category=category_filter, view='number') }}"
+               class="question-number-button question-number-{{ item.status }} {% if selected_detail and selected_detail.number == item.number %}is-active{% endif %}"
+               aria-label="問題{{ item.number }} {{ item.status_label }}">
+              {{ item.number }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {% if selected_detail %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="rounded-lg bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">問題 {{ selected_detail.number }}</span>
+            <span class="status-pill status-pill-{{ selected_detail.status }}">{{ selected_detail.status_label }}</span>
+            <span class="rounded-lg bg-sky-50 px-3 py-1 text-sm font-bold text-sky-700">{{ selected_detail.category }}</span>
+          </div>
+          <h2 class="mt-5 text-xl font-bold leading-8 text-slate-950">{{ selected_detail.question }}</h2>
+
+          <div class="mt-5 grid gap-3 md:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p class="text-xs font-bold text-slate-500">あなたの回答</p>
+              <p class="mt-2 text-sm font-bold text-slate-900">{{ selected_detail.selected_choice or '未回答' }}</p>
+            </div>
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p class="text-xs font-bold text-emerald-700">正解</p>
+              <p class="mt-2 text-sm font-bold text-emerald-900">{{ selected_detail.correct_answer }}</p>
+            </div>
+          </div>
+
+          <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <p class="text-sm font-bold text-amber-800">解説</p>
+            <p class="mt-3 text-sm leading-7 text-slate-800">{{ selected_detail.explanation or '解説は登録されていません。' }}</p>
+          </div>
+        {% else %}
+          <p class="text-sm text-slate-600">表示できる問題がありません。</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section data-result-view-panel="list" class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm {% if active_view != 'list' %}hidden{% endif %}">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <h2 class="text-lg font-bold text-slate-950">リストから見る</h2>
+        <p class="mt-1 text-sm text-slate-600">正解・不正解・未回答・カテゴリ別に絞り込めます。</p>
+      </div>
+      <form method="get" action="{{ url_for('practice_result_detail') }}" class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <input type="hidden" name="view" value="list" />
+        {% if selected_detail %}
+          <input type="hidden" name="number" value="{{ selected_detail.number }}" />
+        {% endif %}
+        <select name="status" class="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>すべて</option>
+          <option value="correct" {% if status_filter == 'correct' %}selected{% endif %}>正解</option>
+          <option value="incorrect" {% if status_filter == 'incorrect' %}selected{% endif %}>不正解</option>
+          <option value="unanswered" {% if status_filter == 'unanswered' %}selected{% endif %}>未回答</option>
+        </select>
+        <select name="category" class="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800">
+          <option value="all" {% if category_filter == 'all' %}selected{% endif %}>すべてのカテゴリ</option>
+          {% for category in categories %}
+            <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>{{ category }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">絞り込む</button>
+      </form>
+    </div>
+
+    <div class="mt-5 space-y-4">
+      {% for item in filtered_details %}
+        <article class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-lg bg-white px-3 py-1 text-sm font-bold text-slate-700">問題 {{ item.number }}</span>
+            <span class="status-pill status-pill-{{ item.status }}">{{ item.status_label }}</span>
+            <span class="rounded-lg bg-sky-50 px-3 py-1 text-sm font-bold text-sky-700">{{ item.category }}</span>
+          </div>
+          <h3 class="mt-4 text-base font-bold leading-7 text-slate-950">{{ item.question }}</h3>
+          <div class="mt-4 grid gap-3 md:grid-cols-2">
+            <div class="rounded-xl bg-white p-4">
+              <p class="text-xs font-bold text-slate-500">あなたの回答</p>
+              <p class="mt-2 text-sm font-bold text-slate-900">{{ item.selected_choice or '未回答' }}</p>
+            </div>
+            <div class="rounded-xl bg-emerald-50 p-4">
+              <p class="text-xs font-bold text-emerald-700">正解</p>
+              <p class="mt-2 text-sm font-bold text-emerald-900">{{ item.correct_answer }}</p>
+            </div>
+          </div>
+          <div class="mt-4 rounded-xl bg-white p-4">
+            <p class="text-xs font-bold text-amber-700">解説</p>
+            <p class="mt-2 text-sm leading-7 text-slate-800">{{ item.explanation or '解説は登録されていません。' }}</p>
+          </div>
+        </article>
+      {% else %}
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
+          <p class="text-sm font-bold text-slate-700">条件に一致する問題はありません。</p>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<style>
+  .result-view-tab {
+    border-radius: 14px;
+    padding: 12px 18px;
+    color: #475569;
+    font-size: 14px;
+    font-weight: 800;
+    transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+  }
+  .result-view-tab.is-active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 10px 24px -20px rgba(15, 23, 42, 0.8);
+  }
+  .question-number-button {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 800;
+    transition: transform 140ms ease, box-shadow 140ms ease;
+  }
+  .question-number-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px -18px rgba(15, 23, 42, 0.8);
+  }
+  .question-number-correct {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .question-number-incorrect {
+    background: #ffedd5;
+    color: #9a3412;
+  }
+  .question-number-unanswered {
+    background: #f1f5f9;
+    color: #475569;
+  }
+  .question-number-button.is-active {
+    border-color: #0f172a;
+    box-shadow: inset 0 0 0 2px #0f172a;
+  }
+  .status-pill {
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .status-pill-correct {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .status-pill-incorrect {
+    background: #ffedd5;
+    color: #9a3412;
+  }
+  .status-pill-unanswered {
+    background: #f1f5f9;
+    color: #475569;
+  }
+</style>
+
+<script>
+  (function () {
+    const buttons = Array.from(document.querySelectorAll('[data-result-view-button]'));
+    const panels = Array.from(document.querySelectorAll('[data-result-view-panel]'));
+    function activate(view) {
+      buttons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.resultViewButton === view);
+      });
+      panels.forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.resultViewPanel !== view);
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', view);
+      window.history.replaceState({}, '', url);
+    }
+    buttons.forEach((button) => {
+      button.addEventListener('click', function () {
+        activate(button.dataset.resultViewButton);
+      });
+    });
+  })();
+</script>
+{% endblock %}

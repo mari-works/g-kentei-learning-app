@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+
+{% block title %}用語学習{% endblock %}
+
+{% block content %}
+<div class="term-entry mx-auto max-w-7xl">
+  <section class="term-choice-panel">
+    <div class="term-entry-heading">
+      <h2>どの方法で学習を始めますか？</h2>
+      <p>あなたのスタイルに合わせて学習方法を選べます。</p>
+    </div>
+
+    <div class="term-choice-grid">
+      <a href="{{ url_for('keywords') }}" class="study-method-card study-method-blue">
+        <div class="method-head">
+          <span class="method-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="method-svg">
+              <path d="M4 5.5c2.8-.7 5-.2 8 1.4v12.3c-3-1.6-5.2-2.1-8-1.4V5.5Z"></path>
+              <path d="M20 5.5c-2.8-.7-5-.2-8 1.4v12.3c3-1.6 5.2-2.1 8-1.4V5.5Z"></path>
+              <path d="M12 6.9v12.3"></path>
+            </svg>
+          </span>
+          <div>
+            <h3>用語一覧</h3>
+            <strong>辞書のように確認する</strong>
+          </div>
+        </div>
+        <p class="method-lead">検索・カテゴリ・理解度で絞り込みながら、用語の意味を一覧で確認できます。</p>
+        <div class="method-divider"></div>
+        <div class="method-features">
+          <span><i>□</i>全 {{ total_terms }} 語を収録</span>
+          <span><i>▦</i>{{ category_items|length }} カテゴリで分類</span>
+          <span><i>▼</i>理解度で絞り込み</span>
+          <span><i>⌕</i>キーワード検索に対応</span>
+        </div>
+        <span class="method-button blue">用語一覧を開く <b>›</b></span>
+      </a>
+
+      <a href="{{ url_for('flashcard_settings') }}" class="study-method-card study-method-green">
+        <div class="method-head">
+          <span class="method-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="method-svg">
+              <path d="M5.5 6.5A2.5 2.5 0 0 1 8 4h8a2.5 2.5 0 0 1 2.5 2.5v11A2.5 2.5 0 0 1 16 20H8a2.5 2.5 0 0 1-2.5-2.5v-11Z"></path>
+              <path d="M8.5 8h7"></path>
+              <path d="M8.5 11.5h5"></path>
+              <path d="M8.5 15h6.5"></path>
+              <path d="M16 4v4h2.5"></path>
+            </svg>
+          </span>
+          <div>
+            <h3>フラッシュカード学習</h3>
+            <strong>テンポよく効率的に復習する</strong>
+          </div>
+        </div>
+        <p class="method-lead">フラッシュカード形式で出題されるので、短時間でテンポ良く復習できます。</p>
+        <div class="method-divider"></div>
+        <div class="method-features">
+          <span><i>▰</i>出題範囲を選択（全用語・カテゴリ）</span>
+          <span><i>◎</i>出題対象を選択（未理解・あいまい・理解済み）</span>
+          <span><i>↻</i>カードをめくって確認</span>
+          <span><i>◷</i>前回の続きから再開可能</span>
+        </div>
+        <span class="method-button green">フラッシュカードを始める <b>›</b></span>
+      </a>
+    </div>
+  </section>
+
+  <section class="understanding-panel">
+    <div class="understanding-head">
+      <span class="understanding-icon">▥</span>
+      <div>
+        <h2>現在の理解状況</h2>
+        <p>あなたの理解度の内訳です。</p>
+      </div>
+    </div>
+
+    <div class="understanding-stats">
+      <article class="understanding-card green">
+        <span>✓</span>
+        <div>
+          <h3>理解済み</h3>
+          <strong>{{ understanding_summary.understood.count }}<small>語</small></strong>
+          <p>{{ understanding_summary.understood.rate }}%</p>
+        </div>
+      </article>
+      <article class="understanding-card amber">
+        <span>?</span>
+        <div>
+          <h3>あいまい</h3>
+          <strong>{{ understanding_summary.ambiguous.count }}<small>語</small></strong>
+          <p>{{ understanding_summary.ambiguous.rate }}%</p>
+        </div>
+      </article>
+      <article class="understanding-card red">
+        <span>×</span>
+        <div>
+          <h3>未理解</h3>
+          <strong>{{ understanding_summary.not_understood.count }}<small>語</small></strong>
+          <p>{{ understanding_summary.not_understood.rate }}%</p>
+        </div>
+      </article>
+    </div>
+
+    <a href="{{ url_for('statistics') }}" class="stats-link">統計情報を詳しく見る <b>›</b></a>
+  </section>
+</div>
+
+<style>
+  .term-entry {
+    display: grid;
+    gap: 14px;
+  }
+  .term-choice-panel,
+  .understanding-panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 16px 44px -38px rgba(15, 23, 42, .7);
+  }
+  .term-choice-panel {
+    padding: 22px 28px;
+  }
+  .term-entry-heading {
+    text-align: center;
+  }
+  .term-entry-heading h2 {
+    color: #0f172a;
+    font-size: 27px;
+    font-weight: 950;
+    letter-spacing: 0;
+  }
+  .term-entry-heading p {
+    margin-top: 6px;
+    color: #475569;
+    font-size: 14px;
+    font-weight: 850;
+  }
+  .term-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 22px;
+  }
+  .study-method-card {
+    display: flex;
+    min-height: 372px;
+    flex-direction: column;
+    border: 1px solid #dbeafe;
+    border-radius: 18px;
+    padding: 22px 24px;
+    color: inherit;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .study-method-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 24px 50px -36px rgba(15, 23, 42, .55);
+  }
+  .study-method-blue {
+    background: linear-gradient(135deg, #f8fbff 0%, #fff 75%);
+  }
+  .study-method-green {
+    border-color: #bbf7d0;
+    background: linear-gradient(135deg, #f8fffb 0%, #fff 75%);
+  }
+  .method-head {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .method-icon {
+    display: inline-flex;
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 950;
+  }
+  .method-svg {
+    width: 38px;
+    height: 38px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+  }
+  .study-method-blue .method-icon {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+  .study-method-green .method-icon {
+    background: #dcfce7;
+    color: #059669;
+  }
+  .method-head h3 {
+    color: #0f172a;
+    font-size: 23px;
+    font-weight: 950;
+  }
+  .method-head strong {
+    display: block;
+    margin-top: 6px;
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .study-method-green .method-head strong {
+    color: #059669;
+  }
+  .method-lead {
+    margin-top: 18px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.65;
+  }
+  .method-divider {
+    height: 1px;
+    margin: 20px 0 16px;
+    background: #e2e8f0;
+  }
+  .method-features {
+    display: grid;
+    gap: 12px;
+  }
+  .method-features span {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #1e293b;
+    font-size: 13px;
+    font-weight: 950;
+    line-height: 1.38;
+  }
+  .method-features i {
+    display: inline-flex;
+    width: 24px;
+    flex: 0 0 auto;
+    justify-content: center;
+    color: #2563eb;
+    font-style: normal;
+    font-weight: 950;
+  }
+  .study-method-green .method-features i {
+    color: #059669;
+  }
+  .method-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 14px;
+    border-radius: 12px;
+    padding: 12px 18px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 950;
+  }
+  .method-button.blue {
+    background: #2563eb;
+  }
+  .method-button.green {
+    background: #059669;
+  }
+  .understanding-panel {
+    display: grid;
+    grid-template-columns: 240px 1fr 220px;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 24px;
+  }
+  .understanding-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .understanding-icon {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-weight: 950;
+  }
+  .understanding-head h2 {
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 950;
+  }
+  .understanding-head p {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .understanding-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .understanding-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 14px;
+    padding: 12px 16px;
+  }
+  .understanding-card.green {
+    background: linear-gradient(135deg, #ecfdf5, #ffffff);
+  }
+  .understanding-card.amber {
+    background: linear-gradient(135deg, #fffbeb, #ffffff);
+  }
+  .understanding-card.red {
+    background: linear-gradient(135deg, #fff1f2, #ffffff);
+  }
+  .understanding-card > span {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #fff;
+    font-weight: 950;
+  }
+  .understanding-card.green > span { background: #059669; }
+  .understanding-card.amber > span { background: #f59e0b; }
+  .understanding-card.red > span { background: #ef4444; }
+  .understanding-card h3 {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .understanding-card strong {
+    display: block;
+    margin-top: 2px;
+    color: #0f172a;
+    font-size: 23px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .understanding-card small {
+    margin-left: 3px;
+    font-size: 13px;
+  }
+  .understanding-card p {
+    margin-top: 2px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .stats-link {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  @media (max-width: 1200px) {
+    .term-choice-grid,
+    .understanding-panel,
+    .understanding-stats {
+      grid-template-columns: 1fr;
+    }
+    .stats-link {
+      justify-content: flex-start;
+    }
+  }
+</style>
+{% endblock %}

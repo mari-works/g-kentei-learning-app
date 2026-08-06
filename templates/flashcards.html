@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+
+{% block title %}フラッシュカード学習{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl">
+  <style>
+    .perspective { perspective: 1100px; }
+    .preserve-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+    #card-inner { transform-origin: center; }
+  </style>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ url_for('flashcard_settings') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">← 一覧に戻る</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="direction-toggle">
+          <button type="button" data-direction="meaning_to_term" class="direction-btn">意味→単語</button>
+          <button type="button" data-direction="term_to_meaning" class="direction-btn">単語→意味</button>
+        </div>
+        <div class="text-right text-sm font-bold text-slate-700">
+          <span id="card-count">1</span> / <span id="total-count">{{ keywords|length }}</span>
+        </div>
+        <div class="h-2 w-36 overflow-hidden rounded-full bg-slate-200">
+          <div id="card-progress" class="h-full rounded-full bg-emerald-600" style="width: 0%"></div>
+        </div>
+        <a href="{{ url_for('flashcard_settings') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" aria-label="設定">⚙</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
+      <div id="idle-message" class="mb-5 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+        一定時間操作がなかったため、学習時間の計測を一時停止しています。
+      </div>
+      <div class="grid items-center gap-5 md:grid-cols-[56px_minmax(0,1fr)_56px]">
+        <button id="prev-btn" class="nav-circle" aria-label="前のカード">‹</button>
+
+        <div id="card-area" class="flex min-h-[440px] items-center justify-center">
+          <div id="flashcard" class="relative h-[26rem] w-full max-w-3xl perspective cursor-pointer">
+            <div id="card-inner" class="absolute inset-0 transition-transform duration-500 preserve-3d">
+              <div id="card-front" class="absolute inset-0 flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-8 shadow-sm backface-hidden">
+                <div class="flex justify-start">
+                  <span class="rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700">表面</span>
+                </div>
+                <div class="text-center">
+                  <p class="text-sm font-bold text-slate-500">Q.</p>
+                  <div id="card-description" class="mt-3 text-2xl font-bold leading-10 text-slate-950"></div>
+                </div>
+                <div class="text-center text-sm font-semibold text-slate-400">クリック / Space / Enter で答えを表示</div>
+              </div>
+
+              <div id="card-back" class="absolute inset-0 flex rotate-y-180 transform flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-8 shadow-sm backface-hidden">
+                <div class="flex justify-start">
+                  <span class="rounded-full bg-white px-4 py-2 text-xs font-bold text-emerald-700">裏面</span>
+                </div>
+                <div class="text-center">
+                  <div id="card-term" class="text-4xl font-bold text-emerald-800"></div>
+                  <div id="card-category" class="mt-5 text-sm font-bold text-emerald-700"></div>
+                </div>
+                <div class="text-center text-sm font-semibold text-emerald-700">クリック / Space / Enter で次へ</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="next-btn" class="nav-circle" aria-label="次のカード">›</button>
+      </div>
+
+      <div class="mt-5 grid gap-3 md:grid-cols-3">
+        <button data-status="理解済み" data-key="1" class="status-btn answer-btn answer-green"><span class="keycap">1</span>わかった</button>
+        <button data-status="あいまい" data-key="2" class="status-btn answer-btn answer-amber"><span class="keycap">2</span>あいまい</button>
+        <button data-status="未理解" data-key="3" class="status-btn answer-btn answer-rose"><span class="keycap">3</span>わからなかった</button>
+      </div>
+
+      <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold leading-6 text-slate-600">
+        キーボード: <span class="shortcut-key">Space</span>/<span class="shortcut-key">Enter</span> 表示・次へ　
+        <span class="shortcut-key">1</span> わかった　
+        <span class="shortcut-key">2</span> あいまい　
+        <span class="shortcut-key">3</span> わからなかった　
+        <span class="shortcut-key">←</span>/<span class="shortcut-key">→</span> 前後移動
+      </div>
+    </section>
+
+    <aside class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+      <h2 class="text-sm font-bold text-slate-950">学習データ</h2>
+      <div class="mt-5 space-y-3">
+        <div class="data-card">
+          <span class="data-mark data-green">✓</span>
+          <span>今日の学習</span>
+          <strong><span id="session-count">0</span>語</strong>
+        </div>
+        <div class="data-card">
+          <span class="data-mark data-blue">☆</span>
+          <span>覚えた</span>
+          <strong><span id="session-mastered">{{ status_counts['理解済み'] }}</span>語</strong>
+        </div>
+        <div class="data-card">
+          <span class="data-mark data-rose">△</span>
+          <span>苦手</span>
+          <strong><span id="session-weak">{{ status_counts['未理解'] }}</span>語</strong>
+        </div>
+      </div>
+
+      <div class="mt-7 border-t border-emerald-100 pt-5">
+        <h3 class="text-xs font-bold text-slate-500">ショートカット</h3>
+        <button id="pause-btn" type="button" class="side-action mt-3">一時停止</button>
+        <label class="side-action mt-2 cursor-pointer">
+          <input id="random-toggle" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-emerald-600" {% if random_flag %}checked{% endif %}>
+          <span>シャッフル</span>
+        </label>
+      </div>
+
+      <div class="mt-7 border-t border-emerald-100 pt-5">
+        <p class="text-xs font-bold text-slate-500">今回の範囲</p>
+        <p class="mt-2 text-sm font-bold leading-6 text-slate-800">
+          {% if status %}{{ status }}{% elif category %}{{ category }}{% elif big_category %}{{ big_category }}{% else %}すべての用語{% endif %}
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<style>
+  .nav-circle {
+    display: inline-flex;
+    height: 46px;
+    width: 46px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+    font-size: 28px;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+    transition: background 160ms ease, transform 160ms ease;
+  }
+  .nav-circle:hover { background: #f8fafc; transform: translateY(-1px); }
+  .answer-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 56px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .answer-rose { border-color: #fecdd3; background: #fff1f2; color: #e11d48; }
+  .answer-amber { border-color: #fde68a; background: #fffbeb; color: #d97706; }
+  .answer-green { border-color: #bbf7d0; background: #ecfdf5; color: #047857; }
+  .keycap,
+  .shortcut-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid rgba(100, 116, 139, .24);
+    background: #fff;
+    color: #334155;
+    font-weight: 900;
+  }
+  .keycap {
+    height: 28px;
+    min-width: 28px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .shortcut-key {
+    min-height: 22px;
+    min-width: 22px;
+    padding: 0 7px;
+    font-size: 11px;
+  }
+  .data-card {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 8px 10px;
+    align-items: center;
+    border-radius: 14px;
+    background: rgba(255,255,255,.72);
+    padding: 14px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #64748b;
+  }
+  .data-card strong {
+    grid-column: 2;
+    font-size: 22px;
+    line-height: 1;
+    color: #0f172a;
+  }
+  .data-mark {
+    grid-row: span 2;
+    display: inline-flex;
+    height: 28px;
+    width: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .data-green { background: #dcfce7; color: #059669; }
+  .data-blue { background: #e0f2fe; color: #0284c7; }
+  .data-rose { background: #ffe4e6; color: #e11d48; }
+  .side-action {
+    display: flex;
+    min-height: 42px;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: 12px;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 800;
+    color: #334155;
+    transition: background 160ms ease;
+  }
+  .side-action:hover { background: rgba(255,255,255,.65); }
+  .direction-toggle {
+    display: flex;
+    border-radius: 14px;
+    background: #f1f5f9;
+    padding: 4px;
+  }
+  .direction-btn {
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #64748b;
+  }
+  .direction-btn.is-active {
+    background: #fff;
+    color: #047857;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+  }
+</style>
+
+<script>
+  const FLASHCARDS = {{ keywords|tojson }};
+  const START_RANDOM = {{ 'true' if random_flag else 'false' }};
+  const CARD_DIRECTION = {{ direction|tojson }};
+  const START_INDEX = {{ resume_index|tojson }};
+  const FLASHCARD_RANGE_LABEL = {{ (status or category or big_category or 'すべての用語')|tojson }};
+  const FLASHCARD_LEARNING_MODE = {{ learning_mode|tojson }};
+  const FLASHCARD_LEARNING_CATEGORY = {{ learning_category|tojson }};
+  const FLASHCARD_FILTER_STATUS = {{ status|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/flashcards.js') }}"></script>
+{% endblock %}

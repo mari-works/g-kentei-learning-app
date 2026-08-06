@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+
+{% block title %}用語一覧{% endblock %}
+
+{% block content %}
+<div class="keywords-page mx-auto max-w-7xl">
+  <section class="keyword-search-card">
+    <form method="get" class="keyword-filter-form">
+      <label class="keyword-search-box">
+        <span>⌕</span>
+        <input name="search" type="search" value="{{ search }}" placeholder="用語名・説明から検索" />
+      </label>
+
+      <div class="keyword-filter-panel">
+        <label class="filter-field">
+          <span>カテゴリ</span>
+          <select name="category">
+            <option value="">すべて</option>
+            {% for item in all_categories %}
+              <option value="{{ item.category }}" {% if item.category == selected_category %}selected{% endif %}>{{ item.category }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span>理解度</span>
+          <select name="status">
+            <option value="">すべて</option>
+            <option value="未学習" {% if selected_status == '未学習' %}selected{% endif %}>未学習</option>
+            <option value="未理解" {% if selected_status == '未理解' %}selected{% endif %}>未理解</option>
+            <option value="あいまい" {% if selected_status == 'あいまい' %}selected{% endif %}>あいまい</option>
+            <option value="理解済み" {% if selected_status == '理解済み' %}selected{% endif %}>理解済み</option>
+          </select>
+        </label>
+
+        <label class="review-filter">
+          <input type="checkbox" name="review_later" value="1" {% if selected_review_later %}checked{% endif %} />
+          <span>
+            <strong>あとで確認</strong>
+            <small>追加した用語のみ</small>
+          </span>
+        </label>
+
+        <div class="filter-actions">
+          <button type="submit" class="search-submit">検索</button>
+          <a href="{{ url_for('keywords') }}" class="reset-link">↻ リセット</a>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <p class="keyword-result-count">{{ keywords|length }}語の用語が見つかりました</p>
+
+  <section class="keyword-list-card">
+    <div class="keyword-table-head">
+      <span>用語</span>
+      <span>カテゴリ</span>
+      <span>理解度</span>
+      <span>あとで確認</span>
+    </div>
+
+    {% if keywords %}
+      <div class="keyword-table-body">
+        {% for keyword in keywords %}
+          <div class="keyword-row">
+            <a href="{{ url_for('keyword_detail', keyword_id=keyword.id) }}" class="keyword-main">
+              <span class="term-icon">{{ ['⌞','△','▥','◇','⌁'][loop.index0 % 5] }}</span>
+              <span>
+                <strong>{{ keyword.keyword }}</strong>
+                <small>{{ keyword.meaning }}</small>
+              </span>
+            </a>
+
+            <div class="keyword-category">
+              <span>▣</span>
+              <strong>{{ keyword.category }}</strong>
+            </div>
+
+            {% if keyword.learning_status == '理解済み' %}
+              <span class="status-pill status-green">理解済み</span>
+            {% elif keyword.learning_status == 'あいまい' %}
+              <span class="status-pill status-amber">あいまい</span>
+            {% elif keyword.learning_status == '未理解' %}
+              <span class="status-pill status-rose">未理解</span>
+            {% else %}
+              <span class="status-pill status-slate">未学習</span>
+            {% endif %}
+
+            <button
+              type="button"
+              class="review-star {% if keyword.review_later %}is-active{% endif %}"
+              data-keyword-id="{{ keyword.id }}"
+              data-review-later="{{ 1 if keyword.review_later else 0 }}"
+              aria-label="あとで確認を切り替え"
+            >{% if keyword.review_later %}★{% else %}☆{% endif %}</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="keyword-empty">該当する用語がありません。</div>
+    {% endif %}
+  </section>
+</div>
+
+<style>
+  .keywords-page {
+    width: 100%;
+    max-width: none !important;
+  }
+  .keyword-search-card,
+  .keyword-list-card {
+    border-radius: 18px;
+    border: 1px solid #dbe3ea;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  }
+  .keyword-search-card {
+    padding: 18px;
+  }
+  .keyword-filter-form {
+    display: grid;
+    gap: 16px;
+  }
+  .keyword-search-box {
+    position: relative;
+    display: block;
+    max-width: 720px;
+  }
+  .keyword-search-box span {
+    position: absolute;
+    inset: 0 auto 0 18px;
+    display: flex;
+    align-items: center;
+    color: #64748b;
+    font-size: 20px;
+  }
+  .keyword-search-box input {
+    width: 100%;
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    padding: 0 18px 0 52px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .keyword-search-box input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .08);
+  }
+  .keyword-filter-panel {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) minmax(180px, 260px) minmax(210px, 1fr) auto;
+    gap: 18px;
+    align-items: end;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 18px 22px;
+  }
+  .filter-field {
+    display: grid;
+    gap: 9px;
+  }
+  .filter-field span,
+  .review-filter strong {
+    font-size: 13px;
+    font-weight: 900;
+    color: #0f172a;
+  }
+  .filter-field select {
+    height: 46px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .review-filter {
+    display: inline-flex;
+    min-height: 46px;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 1px;
+  }
+  .review-filter input {
+    width: 22px;
+    height: 22px;
+    accent-color: #2563eb;
+  }
+  .review-filter span {
+    display: grid;
+    gap: 3px;
+  }
+  .review-filter small {
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b;
+  }
+  .filter-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .search-submit,
+  .reset-link {
+    display: inline-flex;
+    height: 46px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .search-submit {
+    background: #2563eb;
+    color: #fff;
+  }
+  .reset-link {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+  }
+  .keyword-result-count {
+    margin: 20px 0 12px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #475569;
+  }
+  .keyword-list-card {
+    overflow: hidden;
+  }
+  .keyword-table-head,
+  .keyword-row {
+    display: grid;
+    grid-template-columns: minmax(360px, 1.6fr) minmax(210px, .75fr) 130px 110px;
+    gap: 18px;
+    align-items: center;
+  }
+  .keyword-table-head {
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #334155;
+  }
+  .keyword-row {
+    min-height: 90px;
+    border-bottom: 1px solid #edf2f7;
+    padding: 14px 20px;
+  }
+  .keyword-row:last-child {
+    border-bottom: 0;
+  }
+  .keyword-main {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    min-width: 0;
+  }
+  .term-icon {
+    display: inline-flex;
+    height: 48px;
+    width: 48px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 24px;
+    font-weight: 900;
+  }
+  .keyword-main strong {
+    display: block;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 900;
+  }
+  .keyword-main small {
+    display: -webkit-box;
+    margin-top: 5px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.55;
+  }
+  .keyword-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    color: #0f172a;
+  }
+  .keyword-category span {
+    color: #059669;
+    font-size: 18px;
+  }
+  .keyword-category strong {
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.5;
+  }
+  .status-pill {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .status-green { background: #dcfce7; color: #047857; }
+  .status-amber { background: #ffedd5; color: #ea580c; }
+  .status-rose { background: #ffe4e6; color: #e11d48; }
+  .status-slate { background: #f1f5f9; color: #64748b; }
+  .review-star {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #64748b;
+    font-size: 28px;
+    line-height: 1;
+    transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+  .review-star:hover {
+    background: #f8fafc;
+    transform: translateY(-1px);
+  }
+  .review-star.is-active {
+    color: #f59e0b;
+  }
+  .keyword-empty {
+    padding: 42px;
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  @media (max-width: 1100px) {
+    .keyword-filter-panel {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .filter-actions {
+      justify-content: flex-start;
+    }
+    .keyword-table-head,
+    .keyword-row {
+      grid-template-columns: minmax(0, 1fr) 160px 110px 80px;
+    }
+  }
+  @media (max-width: 760px) {
+    .keyword-filter-panel,
+    .keyword-table-head,
+    .keyword-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.review-star').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const current = button.dataset.reviewLater === '1';
+      const next = !current;
+      const id = button.dataset.keywordId;
+      try {
+        const response = await fetch(`/api/keywords/${id}/review_later`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ review_later: next })
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        button.dataset.reviewLater = data.review_later ? '1' : '0';
+        button.classList.toggle('is-active', data.review_later);
+        button.textContent = data.review_later ? '★' : '☆';
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  });
+</script>
+{% endblock %}

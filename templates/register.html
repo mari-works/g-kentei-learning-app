@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}新規登録{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <section class="auth-card">
+    <div class="auth-brand">
+      <span>G</span>
+      <div>
+        <p>G検定学習支援</p>
+        <h1>AI for Everyone</h1>
+      </div>
+    </div>
+    <h2>新規登録</h2>
+    <p class="auth-lead">メールアドレスは不要です。ユーザー名とパスワードで登録できます。</p>
+    {% if error %}
+      <div class="auth-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <label>
+        <span>ユーザー名</span>
+        <input name="username" value="{{ username }}" autocomplete="username" required />
+      </label>
+      <label>
+        <span>パスワード</span>
+        <input type="password" name="password" autocomplete="new-password" required />
+      </label>
+      <label>
+        <span>パスワード確認</span>
+        <input type="password" name="password_confirm" autocomplete="new-password" required />
+      </label>
+      <button type="submit">登録する</button>
+    </form>
+    <p class="auth-link">すでにアカウントをお持ちの場合は <a href="{{ url_for('login') }}">ログイン</a></p>
+  </section>
+</div>
+
+<style>
+  .auth-shell {
+    display: grid;
+    min-height: calc(100vh - 64px);
+    place-items: center;
+  }
+  .auth-card {
+    width: min(420px, 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    background: #fff;
+    padding: 28px;
+    box-shadow: 0 18px 50px -38px rgba(15, 23, 42, .65);
+  }
+  .auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .auth-brand > span {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: #0284c7;
+    color: #fff;
+    font-weight: 950;
+  }
+  .auth-brand p,
+  .auth-lead,
+  .auth-link {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .auth-brand h1,
+  .auth-card h2 {
+    color: #0f172a;
+    font-weight: 950;
+  }
+  .auth-card h2 {
+    margin-top: 24px;
+    font-size: 26px;
+  }
+  .auth-lead {
+    margin-top: 6px;
+    line-height: 1.7;
+  }
+  .auth-error {
+    margin-top: 16px;
+    border-radius: 12px;
+    background: #fff1f2;
+    padding: 12px;
+    color: #be123c;
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .auth-form {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .auth-form label {
+    display: grid;
+    gap: 7px;
+  }
+  .auth-form label span {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .auth-form input {
+    height: 44px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0 14px;
+    color: #0f172a;
+    font-weight: 800;
+  }
+  .auth-form input:focus {
+    border-color: #0ea5e9;
+    outline: 3px solid #e0f2fe;
+  }
+  .auth-form button {
+    height: 46px;
+    border-radius: 12px;
+    background: #059669;
+    color: #fff;
+    font-weight: 950;
+  }
+  .auth-link {
+    margin-top: 18px;
+    text-align: center;
+  }
+  .auth-link a {
+    color: #2563eb;
+    font-weight: 950;
+  }
+</style>
+{% endblock %}

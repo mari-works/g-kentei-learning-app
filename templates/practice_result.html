@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}結果{% endblock %}
+
+{% block content %}
+{% set is_graded_pause = quiz_state.get('graded_pause') %}
+<div class="mx-auto max-w-6xl">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+    <div class="text-center">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-4xl">{% if is_graded_pause %}📊{% else %}🎉{% endif %}</div>
+      <h1 class="mt-4 text-3xl font-bold text-slate-950">{% if is_graded_pause %}ここまでの採点結果{% else %}お疲れさまでした！{% endif %}</h1>
+      <p class="mt-2 text-sm text-slate-600">
+        {% if is_graded_pause %}
+          問題{{ quiz_state.current_index + 1 }}で中断しています。正答率は回答済み {{ summary.answered }} 問を分母にしています。
+        {% elif quiz_state.mode == 'exam' %}
+          試験モード（{{ '会場試験' if quiz_state.exam_type == 'onsite' else 'オンライン試験' }}）を終了しました。
+        {% else %}
+          演習が終了しました。
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+      <div class="grid gap-7 lg:grid-cols-[280px_1fr] lg:items-center">
+        <div class="mx-auto">
+          <div class="result-ring" style="--score: {{ summary.accuracy }};">
+            <div class="result-ring-inner">
+              <p class="text-sm font-bold text-slate-700">正答率</p>
+              <p class="mt-1 text-4xl font-bold text-slate-950">{{ summary.accuracy }}%</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <a href="{{ url_for('practice_result_detail') }}" class="mb-5 flex items-center justify-between gap-4 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100">
+            <span>
+              詳細を見る
+              <span class="mt-1 block text-xs font-semibold text-emerald-700">問題ごとの回答と解説を確認</span>
+            </span>
+            <span class="text-xl">→</span>
+          </a>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="result-stat">
+              <p>正解数</p>
+              <strong>{{ summary.correct }}<span>問</span></strong>
+            </div>
+            <div class="result-stat">
+              <p>不正解数</p>
+              <strong>{{ summary.incorrect }}<span>問</span></strong>
+            </div>
+            {% if is_graded_pause %}
+              <div class="result-stat">
+                <p>未回答数</p>
+                <strong>{{ summary.unanswered }}<span>問</span></strong>
+              </div>
+              <div class="result-stat">
+                <p>解答済み数</p>
+                <strong>{{ summary.answered }}<span>問</span></strong>
+              </div>
+              <div class="result-stat">
+                <p>解答時間</p>
+                <strong>{{ format_duration(summary.elapsed_seconds) }}</strong>
+              </div>
+            {% else %}
+            <div class="result-stat">
+              <p>解答時間</p>
+              <strong>{{ format_duration(summary.elapsed_seconds) }}</strong>
+            </div>
+            <div class="result-stat">
+              <p>問題数</p>
+              <strong>{{ summary.total }}<span>問</span></strong>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <h2 class="text-lg font-bold text-slate-950">カテゴリ別正答率</h2>
+      <div class="mt-4 grid gap-3 md:grid-cols-2">
+        {% for item in category_summary %}
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between gap-3 text-sm">
+              <span class="font-bold text-slate-800">{{ item.category }}</span>
+              <span class="font-bold text-emerald-700">{{ item.accuracy }}%</span>
+            </div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div class="h-full rounded-full bg-emerald-600" style="width: {{ item.accuracy }}%"></div>
+            </div>
+            <p class="mt-2 text-xs font-semibold text-slate-500">
+              {% if is_graded_pause %}
+                {{ item.correct }} / {{ item.answered }} 問正解・未回答 {{ item.unanswered }} 問
+              {% else %}
+                {{ item.correct }} / {{ item.total }} 問正解
+              {% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div class="mt-7 grid gap-3 md:grid-cols-3">
+      {% if is_graded_pause %}
+        <form method="post" action="{{ url_for('practice_quiz') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="mode" value="exam" />
+          <button type="submit" name="action" value="resume" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-center text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">試験を再開する</button>
+        </form>
+        <a href="{{ url_for('practice_quiz', mode='wrong', reset=1, start=1) }}" class="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-50">間違えた問題を復習</a>
+      {% else %}
+        <a href="{{ url_for('practice_quiz', mode='wrong', reset=1, start=1) }}" class="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-50">間違えた問題を復習</a>
+        {% if selected_mode == 'exam' %}
+          <a href="{{ url_for('practice_quiz', mode='exam', reset=1, start=1, exam_type=quiz_state.exam_type or 'online') }}" class="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-50">もう一度解く</a>
+        {% else %}
+          <a href="{{ url_for('practice_quiz', mode=selected_mode, reset=1, start=1) }}" class="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-50">もう一度解く</a>
+        {% endif %}
+      {% endif %}
+      <a href="{{ url_for('practice') }}" class="rounded-xl bg-emerald-600 px-6 py-4 text-center text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">トップへ戻る</a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .result-ring {
+    display: grid;
+    height: 220px;
+    width: 220px;
+    place-items: center;
+    border-radius: 999px;
+    background: conic-gradient(#16a34a calc(var(--score) * 1%), #d9f0e0 0);
+  }
+  .result-ring-inner {
+    display: grid;
+    height: 156px;
+    width: 156px;
+    place-items: center;
+    border-radius: 999px;
+    background: #ffffff;
+    text-align: center;
+  }
+  .result-stat {
+    border-left: 1px solid #e2e8f0;
+    padding: 14px 20px;
+  }
+  .result-stat p {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .result-stat strong {
+    display: block;
+    margin-top: 8px;
+    color: #0f172a;
+    font-size: 28px;
+    line-height: 1;
+  }
+  .result-stat span {
+    margin-left: 4px;
+    font-size: 13px;
+  }
+</style>
+{% endblock %}

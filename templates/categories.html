@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}カテゴリ一覧{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <p class="text-sm font-bold uppercase tracking-[0.22em] text-slate-400">カテゴリ一覧</p>
+        <h1 class="mt-2 text-3xl font-bold text-slate-950">{{ big_category }} のカテゴリ</h1>
+        <p class="mt-2 text-sm text-slate-600">カテゴリごとの理解度を確認して、学習を始めましょう。</p>
+      </div>
+      <a href="{{ url_for('big_categories') }}" class="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">← 用語学習トップへ</a>
+    </div>
+  </section>
+
+  <section class="mt-6 grid gap-5 lg:grid-cols-2">
+    {% for item in categories %}
+      <a href="{{ url_for('category_detail') }}?big_category={{ big_category }}&category={{ item.category }}" class="term-list-card">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-bold text-slate-500">カテゴリ</p>
+            <h2 class="mt-2 text-xl font-bold text-slate-950">{{ item.category }}</h2>
+          </div>
+          <span class="rounded-xl bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">{{ item.total }} 語</span>
+        </div>
+
+        <div class="mt-5 grid grid-cols-2 gap-3">
+          <div class="rounded-xl bg-slate-50 p-4">
+            <p class="text-xs font-bold text-slate-500">理解済み</p>
+            <p class="mt-1 text-2xl font-bold text-slate-950">{{ item.understood }}</p>
+          </div>
+          <div class="rounded-xl bg-slate-50 p-4">
+            <p class="text-xs font-bold text-slate-500">進捗</p>
+            <p class="mt-1 text-2xl font-bold text-slate-950">{{ item.progress_rate }}%</p>
+          </div>
+        </div>
+
+        <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-200">
+          <div class="h-full rounded-full bg-emerald-600" style="width: {{ item.progress_rate }}%"></div>
+        </div>
+      </a>
+    {% endfor %}
+  </section>
+</div>
+
+<style>
+  .term-list-card {
+    display: block;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    padding: 24px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .term-list-card:hover {
+    transform: translateY(-2px);
+    border-color: #34d399;
+    box-shadow: 0 24px 50px -36px rgba(15, 23, 42, 0.55);
+  }
+</style>
+{% endblock %}

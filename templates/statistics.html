@@ -1,0 +1,3984 @@
+{% extends 'base.html' %}
+
+{% block title %}統計情報{% endblock %}
+
+{% block content %}
+<div class="stats-page mx-auto max-w-7xl">
+  <nav class="stats-tabs" aria-label="統計情報タブ">
+    <button type="button" class="stats-tab is-active" data-stats-tab="terms">用語理解度</button>
+    <button type="button" class="stats-tab" data-stats-tab="practice">問題演習</button>
+    <button type="button" class="stats-tab" data-stats-tab="overall">総合分析</button>
+  </nav>
+
+  <section class="stats-tab-panel is-active" data-stats-panel="terms">
+    <section class="overall-card">
+      <div class="overall-left">
+        <h2>全体理解度</h2>
+        <div class="donut-row">
+          <div class="summary-donut" style="background: {{ donut_style }};">
+            <div>
+              <strong>{{ overall_status[0].rate }}%</strong>
+              <span>理解度</span>
+            </div>
+          </div>
+          <div class="donut-legend">
+            {% for item in overall_status %}
+              <span class="{{ item.tone }}"><i></i>{{ item.label }} <b>{{ item.count }}語</b> <em>{{ item.rate }}%</em></span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-metric blue">
+        <span>▣</span>
+        <p>総用語数</p>
+        <strong>{{ analysis_total }}<small>語</small></strong>
+      </div>
+      {% for item in overall_status %}
+        <div class="summary-metric {{ item.tone }}">
+          <span>{{ item.icon }}</span>
+          <p>{{ item.label }}</p>
+          <strong>{{ item.count }}<small>語</small></strong>
+          <em>{{ item.rate }}%</em>
+        </div>
+      {% endfor %}
+    </section>
+
+    <div class="middle-grid">
+      <section class="review-card">
+        <div class="card-head">
+          <h2>要復習用語</h2>
+          <span>?</span>
+        </div>
+        <div class="review-count">
+          <span>↻</span>
+          <strong>{{ overall_status[1].count + overall_status[2].count }}<small>語</small></strong>
+        </div>
+        <p>あいまい・未理解のうち、優先して確認したい用語です。</p>
+        <div class="review-breakdown">
+          <div class="red">
+            <span>未理解</span>
+            <strong>{{ overall_status[2].count }}語</strong>
+          </div>
+          <div class="amber">
+            <span>あいまい</span>
+            <strong>{{ overall_status[1].count }}語</strong>
+          </div>
+        </div>
+        <a href="{{ url_for('flashcards', preset='recommended', learning_mode='review', limit=20, random=1, direction='term_to_meaning') }}" class="review-button">フラッシュカードで復習する <b>›</b></a>
+        <small>要復習用語だけを出題します</small>
+      </section>
+
+      <section class="trend-card">
+        <div class="trend-head">
+          <div class="card-head">
+            <h2>理解度推移</h2>
+            <span>?</span>
+          </div>
+          <div class="period-tabs">
+            {% for key, label in [('7','7日'), ('30','30日'), ('90','90日'), ('all','全期間')] %}
+              <button type="button" class="{% if key == '30' %}is-active{% endif %}" data-trend-tab="{{ key }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="trend-chart-wrap">
+          {% for key, trend in trend_periods.items() %}
+            <svg viewBox="0 0 760 190" class="trend-chart {% if key == '30' %}is-active{% endif %}" data-trend-panel="{{ key }}" preserveAspectRatio="none">
+              <line x1="24" y1="45" x2="736" y2="45"></line>
+              <line x1="24" y1="85" x2="736" y2="85"></line>
+              <line x1="24" y1="125" x2="736" y2="125"></line>
+              <line x1="24" y1="170" x2="736" y2="170"></line>
+              <polygon points="{{ trend.area }}"></polygon>
+              <polyline points="{{ trend.polyline }}"></polyline>
+              {% for point in trend.points %}
+                <circle cx="{{ point.x }}" cy="{{ point.y }}" r="{% if loop.last or loop.first %}4.2{% else %}3.2{% endif %}"></circle>
+                {% if loop.first or loop.last %}
+                  <text x="{{ point.x }}" y="{{ point.y - 12 }}">{{ point.rate }}%</text>
+                {% endif %}
+              {% endfor %}
+              <text x="24" y="186">{{ trend.points[0].label }}</text>
+              <text x="374" y="186">中間</text>
+              <text x="716" y="186">今日</text>
+            </svg>
+          {% endfor %}
+        </div>
+
+        <div class="trend-stat-grid">
+          {% for key, trend in trend_periods.items() %}
+            <div class="trend-stat-set {% if key == '30' %}is-active{% endif %}" data-trend-stats="{{ key }}">
+              <article>
+                <span>{{ trend.before_label }}</span>
+                <strong>{{ trend.before_rate }}%</strong>
+              </article>
+              <article>
+                <span>現在の理解度</span>
+                <strong>{{ trend.current_rate }}%</strong>
+              </article>
+              <article class="green">
+                <span>変化{% if key != 'all' %}（{{ trend.days }}日間）{% endif %}</span>
+                <strong>+{{ trend.change }}ポイント</strong>
+              </article>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <section class="detail-card">
+      <div class="detail-head">
+        <h2>詳細分析</h2>
+        <p>分析項目を選択すると、下の内容だけ切り替わります。</p>
+      </div>
+      <div class="analysis-chip-row" role="tablist" aria-label="詳細分析">
+        {% for key, label in [
+          ('weak-terms','苦手用語TOP10'),
+          ('category-understanding','カテゴリ別理解度'),
+          ('review-terms','要復習用語'),
+          ('growth-terms','成長した用語'),
+          ('forgetting-terms','忘れそうな用語')
+        ] %}
+          <button type="button" class="analysis-chip {% if loop.first %}is-active{% endif %}" data-analysis-tab="{{ key }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="analysis-content is-active" data-analysis-panel="weak-terms">
+        {% if not term_detail_analysis.has_history %}
+          <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
+        {% elif term_detail_analysis.weak_terms %}
+          <div class="term-analysis-table weak-term-table">
+            <div class="term-analysis-head"><span>順位</span><span>用語名</span><span>カテゴリ</span><span>現在</span><span>未理解</span><span>あいまい</span><span>スコア</span><span>最終学習日</span><span></span></div>
+            {% for item in term_detail_analysis.weak_terms %}
+              <div class="term-analysis-row">
+                <b class="{% if loop.index <= 3 %}rank-top{% endif %}">{{ loop.index }}</b>
+                <strong>{{ item.keyword }}</strong>
+                <span>{{ item.category }}</span>
+                <mark class="status-{{ item.status_tone }}">{{ item.status_label }}</mark>
+                <em>{{ item.unknown_count }}</em>
+                <em>{{ item.ambiguous_count }}</em>
+                <em>{{ item.weak_score }}</em>
+                <span>{{ item.last_reviewed_label }}</span>
+                <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">この用語を復習</a>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-analysis">苦手用語はまだありません。</div>
+        {% endif %}
+      </div>
+
+      <div class="analysis-content" data-analysis-panel="category-understanding">
+        <div class="analysis-toolbar">
+          <label>並び替え
+            <select data-category-sort>
+              <option value="low">理解度が低い順</option>
+              <option value="high">理解度が高い順</option>
+              <option value="unknown">未理解数が多い順</option>
+              <option value="untrained">未学習数が多い順</option>
+              <option value="name">カテゴリ名順</option>
+            </select>
+          </label>
+        </div>
+        <div class="term-analysis-table category-term-table">
+          <div class="term-analysis-head"><span>カテゴリ名</span><span>理解度</span><span>理解済み</span><span>あいまい</span><span>未理解</span><span>未学習</span><span>総用語数</span><span>状態</span><span>進捗</span></div>
+          {% for item in term_detail_analysis.category_understanding %}
+            <div class="term-analysis-row" data-category-row data-rate="{{ item.rate }}" data-name="{{ item.name }}" data-unknown="{{ item.unknown }}" data-untrained="{{ item.untrained }}">
+              <strong>{{ item.name }}</strong>
+              <em>{{ item.rate }}%</em>
+              <em>{{ item.understood }}</em>
+              <em>{{ item.ambiguous }}</em>
+              <em>{{ item.unknown }}</em>
+              <em>{{ item.untrained }}</em>
+              <em>{{ item.total }}</em>
+              <mark class="status-{{ item.tone }}">{{ item.label }}</mark>
+              <i class="term-progress"><u style="width: {{ item.rate }}%;"></u></i>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="analysis-content" data-analysis-panel="review-terms">
+        {% if not term_detail_analysis.has_history %}
+          <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
+        {% elif term_detail_analysis.review_terms %}
+          <div class="term-analysis-table review-term-table" data-review-list>
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>現在</span><span>最終学習日</span><span>経過</span><span>未理解</span><span>あいまい</span><span>スコア</span><span>優先度</span><span></span></div>
+            {% for item in term_detail_analysis.review_terms %}
+              <div class="term-analysis-row" {% if loop.index > 10 %}data-extra-review hidden{% endif %}>
+                <strong>{{ item.keyword }}</strong>
+                <span>{{ item.category }}</span>
+                <mark class="status-{{ item.status_tone }}">{{ item.status_label }}</mark>
+                <span>{{ item.last_reviewed_label }}</span>
+                <em>{{ item.days_since }}日</em>
+                <em>{{ item.unknown_count }}</em>
+                <em>{{ item.ambiguous_count }}</em>
+                <em>{{ item.review_score }}</em>
+                <mark class="status-{{ item.priority_tone }}">{{ item.priority_label }}</mark>
+                <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">復習</a>
+              </div>
+            {% endfor %}
+          </div>
+          {% if term_detail_analysis.review_terms|length > 10 %}
+            <button type="button" class="show-more-analysis" data-show-review-more>さらに表示</button>
+          {% endif %}
+        {% else %}
+          <div class="empty-analysis">現在、優先して復習する用語はありません。</div>
+        {% endif %}
+      </div>
+
+      <div class="analysis-content" data-analysis-panel="growth-terms">
+        {% if not term_detail_analysis.has_history %}
+          <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
+        {% elif term_detail_analysis.growth_terms %}
+          <div class="term-analysis-table growth-term-table">
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>過去の未理解</span><span>過去のあいまい</span><span>理解済みになった日</span><span>スコア</span><span>変化</span></div>
+            {% for item in term_detail_analysis.growth_terms %}
+              <div class="term-analysis-row">
+                <strong>{{ item.keyword }}</strong>
+                <span>{{ item.category }}</span>
+                <em>{{ item.past_unknown_count }}</em>
+                <em>{{ item.past_ambiguous_count }}</em>
+                <span>{{ item.understood_label }}</span>
+                <em>{{ item.growth_score }}</em>
+                <mark class="status-green">{{ item.change_label }}</mark>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-analysis">理解度の変化が記録されると、成長した用語が表示されます。</div>
+        {% endif %}
+      </div>
+
+      <div class="analysis-content" data-analysis-panel="forgetting-terms">
+        {% if not term_detail_analysis.has_history %}
+          <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
+        {% elif term_detail_analysis.forgetting_terms %}
+          <div class="term-analysis-table forgetting-term-table">
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>最終学習日</span><span>経過</span><span>過去の未理解</span><span>過去のあいまい</span><span>リスク</span><span>状態</span><span></span></div>
+            {% for item in term_detail_analysis.forgetting_terms %}
+              <div class="term-analysis-row">
+                <strong>{{ item.keyword }}</strong>
+                <span>{{ item.category }}</span>
+                <span>{{ item.last_reviewed_label }}</span>
+                <em>{{ item.days_since }}日</em>
+                <em>{{ item.unknown_count }}</em>
+                <em>{{ item.ambiguous_count }}</em>
+                <em>{{ item.forgetting_score }}</em>
+                <mark class="status-{{ item.risk_tone }}">{{ item.risk_label }}</mark>
+                <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">復習</a>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-analysis">長期間復習していない理解済み用語はありません。</div>
+        {% endif %}
+      </div>
+    </section>
+  </section>
+
+  <section class="stats-tab-panel" data-stats-panel="practice">
+    <nav class="practice-mode-tabs" aria-label="問題演習モード">
+      <button type="button" class="is-active" data-practice-mode-tab="normal">通常演習</button>
+      <button type="button" data-practice-mode-tab="exam">試験モード</button>
+    </nav>
+
+    {% for mode_key, mode_data in [('normal', practice_modes.normal), ('exam', practice_modes.exam)] %}
+      <div class="practice-mode-panel {% if mode_key == 'normal' %}is-active{% endif %}" data-practice-mode-panel="{{ mode_key }}">
+        <section class="practice-summary-grid">
+          <article class="practice-summary-card blue">
+            <div class="summary-title">平均正答率 <span title="総正解数 ÷ 総出題数で算出します。">?</span></div>
+            <strong>{{ mode_data.summary.average_accuracy }}<small>%</small></strong>
+            <p>{{ mode_data.label }}・全期間</p>
+          </article>
+          <article class="practice-summary-card blue">
+            <div class="summary-title">直近5回の平均正答率 <span title="直近5回の演習結果を出題数で重み付けして算出します。">?</span></div>
+            <strong>{{ mode_data.summary.recent_accuracy }}<small>%</small></strong>
+            <p>{{ mode_data.label }}・直近5回</p>
+          </article>
+          <article class="practice-summary-card green">
+            <div class="summary-title">正解数 <span>?</span></div>
+            <strong>{{ mode_data.summary.correct }}<small>問</small></strong>
+            <p>{{ mode_data.label }}・全期間</p>
+          </article>
+          <article class="practice-summary-card red">
+            <div class="summary-title">不正解数 <span>?</span></div>
+            <strong>{{ mode_data.summary.incorrect }}<small>問</small></strong>
+            <p>{{ mode_data.label }}・全期間</p>
+          </article>
+          <article class="practice-summary-card slate">
+            <div class="summary-title">解いた問題数 <span>?</span></div>
+            <strong>{{ mode_data.summary.total }}<small>問</small></strong>
+            <p>{{ mode_data.label }}・全期間</p>
+          </article>
+        </section>
+
+        <div class="middle-grid practice-middle-grid">
+          <section class="review-card practice-review-card">
+            <div class="card-head">
+              <h2>要復習問題</h2>
+              <span>?</span>
+            </div>
+            <div class="review-count">
+              <span>↻</span>
+              <strong>{{ mode_data.review.count }}<small>問</small></strong>
+            </div>
+            {% if mode_data.review.count %}
+              <p>{{ mode_data.label }}で過去に間違えた問題のうち、まだ正解できていない問題です。</p>
+              <div class="review-breakdown">
+                <div class="red">
+                  <span>未正解の問題</span>
+                  <strong>{{ mode_data.review.never_correct }}問</strong>
+                </div>
+                <div class="amber">
+                  <span>再び不正解の問題</span>
+                  <strong>{{ mode_data.review.relapsed }}問</strong>
+                </div>
+              </div>
+              {% if mode_key == 'normal' %}
+                <a href="{{ url_for('practice_quiz', mode='wrong', reset=1, start=1) }}" class="review-button">間違えた問題を復習する <b>›</b></a>
+              {% else %}
+                <a href="{{ url_for('practice_quiz', mode='exam', reset=1, start=1) }}" class="review-button">試験モードで再挑戦する <b>›</b></a>
+              {% endif %}
+              <small>{{ mode_data.label }}の要復習問題をもとに開始します</small>
+            {% else %}
+              <p>{{ mode_data.label }}の要復習問題はありません。</p>
+              <span class="review-button is-disabled">復習対象はありません</span>
+              <small>不正解が記録されると復習できます</small>
+            {% endif %}
+          </section>
+
+          <section class="trend-card">
+            <div class="trend-head">
+              <div class="card-head">
+                <h2>正答率の推移</h2>
+                <span>?</span>
+              </div>
+              <div class="period-tabs">
+                {% for key, label in [('7','7日'), ('30','30日'), ('90','90日'), ('all','全期間')] %}
+                  <button type="button" class="{% if key == '30' %}is-active{% endif %}" data-practice-trend-tab="{{ mode_key }}-{{ key }}">{{ label }}</button>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="trend-chart-wrap">
+              {% for key, trend in mode_data.trend_periods.items() %}
+                <svg viewBox="0 0 760 190" class="trend-chart {% if key == '30' %}is-active{% endif %}" data-practice-trend-panel="{{ mode_key }}-{{ key }}" preserveAspectRatio="none">
+                  <line x1="24" y1="45" x2="736" y2="45"></line>
+                  <line x1="24" y1="85" x2="736" y2="85"></line>
+                  <line x1="24" y1="125" x2="736" y2="125"></line>
+                  <line x1="24" y1="170" x2="736" y2="170"></line>
+                  <polygon points="{{ trend.area }}"></polygon>
+                  <polyline points="{{ trend.polyline }}"></polyline>
+                  {% for point in trend.points %}
+                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="{% if loop.last or loop.first %}4.2{% else %}3.2{% endif %}">
+                      <title>{{ point.date.strftime('%Y/%m/%d') }} / {{ mode_data.label }} / {{ point.total }}問 / 正解{{ point.correct }}問 / 正答率{{ point.accuracy }}%</title>
+                    </circle>
+                    {% if loop.first or loop.last or loop.index0 % 3 == 0 %}
+                      <text x="{{ point.x }}" y="{{ point.y - 12 }}">{{ point.accuracy }}%</text>
+                    {% endif %}
+                  {% endfor %}
+                  <text x="24" y="186">{{ trend.points[0].date.strftime('%-m/%-d') }}</text>
+                  <text x="374" y="186">中間</text>
+                  <text x="716" y="186">今日</text>
+                </svg>
+              {% endfor %}
+            </div>
+
+            <div class="trend-stat-grid">
+              {% for key, trend in mode_data.trend_periods.items() %}
+                <div class="trend-stat-set {% if key == '30' %}is-active{% endif %}" data-practice-trend-stats="{{ mode_key }}-{{ key }}">
+                  <article>
+                    <span>{{ trend.before_label }}</span>
+                    <strong>{{ trend.before_rate }}%</strong>
+                  </article>
+                  <article>
+                    <span>現在の平均正答率</span>
+                    <strong>{{ trend.current_rate }}%</strong>
+                  </article>
+                  <article class="green">
+                    <span>変化{% if key != 'all' %}（{{ trend.days }}日間）{% endif %}</span>
+                    <strong>{% if trend.change >= 0 %}+{% endif %}{{ trend.change }}ポイント</strong>
+                  </article>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+
+        <section class="detail-card">
+          <div class="detail-head">
+            <h2>詳細分析</h2>
+            <p>分析項目を選択すると、下の内容だけ切り替わります。</p>
+          </div>
+          <div class="analysis-chip-row" role="tablist" aria-label="{{ mode_data.label }} 詳細分析">
+            {% for key, label in [
+              ('practice-weak','苦手問題TOP10'),
+              ('practice-category-accuracy','カテゴリ別正答率'),
+              ('practice-priority','復習優先問題ランキング'),
+              ('practice-growth','解けるようになった問題'),
+              ('practice-never-correct','一度も解けていない問題')
+            ] %}
+              <button type="button" class="analysis-chip {% if loop.first %}is-active{% endif %}" data-practice-analysis-tab="{{ mode_key }}-{{ key }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+
+          <div class="practice-analysis-content is-active" data-practice-analysis-panel="{{ mode_key }}-practice-weak">
+            {% if mode_data.detail_analysis.weak_questions_top10 %}
+              <div class="practice-detail-table practice-weak-table">
+                <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>問題文</span><span>カテゴリ</span><span>正答率</span><span>正解数/回答回数</span><span>最終回答日</span><span></span></div>
+                {% for item in mode_data.detail_analysis.weak_questions_top10 %}
+                  <div class="practice-detail-row">
+                    <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
+                    <strong>Q-{{ item.id }}</strong>
+                    <span class="question-snippet" title="{{ item.question }}">{{ item.question }}</span>
+                    <em class="category-badge">{{ item.category }}</em>
+                    <mark class="accuracy-pill accuracy-{{ item.accuracy_tone }}">{{ item.accuracy }}%・{{ item.accuracy_label }}</mark>
+                    <p>{{ item.correct }}/{{ item.attempts }}</p>
+                    <p>{{ item.last_answered_label }}</p>
+                    <a href="{{ item.review_url }}">復習</a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-analysis">まだ分析できるデータがありません。</div>
+            {% endif %}
+          </div>
+
+          <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-category-accuracy">
+            {% if mode_data.detail_analysis.category_accuracy %}
+              <div class="analysis-toolbar">
+                <label>並び替え
+                  <select data-practice-category-sort="{{ mode_key }}">
+                    <option value="low">正答率が低い順</option>
+                    <option value="high">正答率が高い順</option>
+                    <option value="total">回答数が多い順</option>
+                    <option value="name">カテゴリ名順</option>
+                  </select>
+                </label>
+              </div>
+              <div class="practice-detail-table practice-category-table" data-practice-category-table="{{ mode_key }}">
+                <div class="practice-detail-head"><span>カテゴリ名</span><span>正答率</span><span>正解数</span><span>回答数</span><span>状態</span><span>進捗</span></div>
+                {% for item in mode_data.detail_analysis.category_accuracy %}
+                  <div class="practice-detail-row" data-practice-category-row data-accuracy="{{ item.accuracy }}" data-total="{{ item.total }}" data-name="{{ item.name }}">
+                    <strong>{{ item.name }}</strong>
+                    <mark class="accuracy-pill accuracy-{{ item.tone }}">{{ item.accuracy }}%</mark>
+                    <p>{{ item.correct }}</p>
+                    <p>{{ item.total }}</p>
+                    <em class="category-badge {{ item.tone }}">{{ item.label }}</em>
+                    <i class="practice-progress"><u style="width: {{ item.accuracy }}%;"></u></i>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-analysis">まだ分析できるデータがありません。</div>
+            {% endif %}
+          </div>
+
+          <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-priority">
+            {% if mode_data.detail_analysis.review_priority %}
+              <div class="practice-detail-table practice-priority-table">
+                <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>不正解回数</span><span>正答率</span><span>最終不正解日</span><span></span></div>
+                {% for item in mode_data.detail_analysis.review_priority %}
+                  <div class="practice-detail-row">
+                    <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
+                    <strong>Q-{{ item.id }}</strong>
+                    <em class="category-badge">{{ item.category }}</em>
+                    <p>{{ item.incorrect }}</p>
+                    <mark class="accuracy-pill accuracy-{{ item.accuracy_tone }}">{{ item.accuracy }}%</mark>
+                    <p>{{ item.last_incorrect_label }}</p>
+                    <a href="{{ item.review_url }}">復習</a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-analysis">まだ分析できるデータがありません。</div>
+            {% endif %}
+          </div>
+
+          <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-growth">
+            {% if mode_data.detail_analysis.improved_questions %}
+              <div class="practice-detail-table practice-growth-table">
+                <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>過去の不正解回数</span><span>最後に正解した日</span><span>変化</span></div>
+                {% for item in mode_data.detail_analysis.improved_questions %}
+                  <div class="practice-detail-row">
+                    <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
+                    <strong>Q-{{ item.id }}</strong>
+                    <em class="category-badge">{{ item.category }}</em>
+                    <p>{{ item.past_incorrect }}</p>
+                    <p>{{ item.last_correct_label }}</p>
+                    <mark class="accuracy-pill accuracy-green">{{ item.change_label }}</mark>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-analysis">まだ分析できるデータがありません。</div>
+            {% endif %}
+          </div>
+
+          <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-never-correct">
+            {% if mode_data.detail_analysis.never_correct %}
+              <div class="practice-detail-table practice-never-table">
+                <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>回答回数</span><span>最終回答日</span><span></span></div>
+                {% for item in mode_data.detail_analysis.never_correct %}
+                  <div class="practice-detail-row">
+                    <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
+                    <strong>Q-{{ item.id }}</strong>
+                    <em class="category-badge">{{ item.category }}</em>
+                    <p>{{ item.attempts }}</p>
+                    <p>{{ item.last_answered_label }}</p>
+                    <a href="{{ item.review_url }}">復習</a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-analysis">まだ分析できるデータがありません。</div>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="stats-tab-panel overall-v3" data-stats-panel="overall">
+    <section class="ov3-summary-grid">
+      <article class="ov3-summary-card blue">
+        <span>◎</span>
+        <p>理解度と正答率の一致率</p>
+        <strong>{{ overall_summary.match_rate }}<small>%</small></strong>
+        <em>前回比 +{{ overall_summary.match_delta }}pt</em>
+        <svg class="ov3-sparkline" viewBox="0 0 180 42" preserveAspectRatio="none">
+          <polyline points="2,30 24,26 46,18 68,28 90,21 112,12 134,18 156,11 178,6"></polyline>
+        </svg>
+      </article>
+      <article class="ov3-summary-card {{ overall_summary.learning_type.tone }}">
+        <span>◌</span>
+        <p>あなたの学習タイプ</p>
+        <strong class="ov3-label-strong">{{ overall_summary.learning_type.label }}</strong>
+        <em>{{ overall_summary.learning_type.description }}</em>
+        <b class="ov3-pill violet">おすすめ：{{ overall_summary.learning_type.recommend }}</b>
+      </article>
+      <article class="ov3-summary-card amber">
+        <span>♙</span>
+        <p>最優先で取り組むカテゴリ</p>
+        {% if overall_summary.top_priority_category %}
+          <strong class="ov3-label-strong">{{ overall_summary.top_priority_category.name }}</strong>
+          <em>{{ overall_summary.top_priority_category.reason }}</em>
+          <a href="#overall-detail" class="ov3-pill amber">詳細を確認する ›</a>
+        {% else %}
+          <strong class="ov3-label-strong">データ待ち</strong>
+          <em>演習データが増えると表示されます。</em>
+        {% endif %}
+      </article>
+      <article class="ov3-summary-card green">
+        <span>☰</span>
+        <p>おすすめ学習</p>
+        <strong class="ov3-label-strong">{{ overall_summary.recommended_method.label }}</strong>
+        <em>{{ overall_summary.recommended_method.description }}</em>
+        <a href="{{ overall_summary.recommended_method.url }}" class="ov3-pill green">{{ overall_summary.recommended_method.button_label }} ›</a>
+      </article>
+    </section>
+
+    <div class="ov3-main-grid">
+      <section class="ov3-map-card">
+        <div class="ov3-card-head">
+          <div>
+            <h2>カテゴリーマップ（理解度 × 正答率）</h2>
+            <p>カテゴリの理解度と演習成績のバランスを確認できます。</p>
+          </div>
+          <span>?</span>
+        </div>
+        <div class="ov3-map">
+          <div class="ov3-quadrant top-left"><strong>実力派</strong><span>理解度は低いが正答率が高い</span></div>
+          <div class="ov3-quadrant top-right"><strong>得意</strong><span>理解度・正答率ともに高い</span></div>
+          <div class="ov3-quadrant bottom-left"><strong>要注意</strong><span>理解度・正答率ともに低い</span></div>
+          <div class="ov3-quadrant bottom-right"><strong>理解したつもり</strong><span>理解度は高いが正答率が低い</span></div>
+          <span class="ov3-axis x-axis">正答率</span>
+          <span class="ov3-axis y-axis">理解度</span>
+          {% for item in overall_categories %}
+            <div class="ov3-map-point" style="left: clamp(14%, {{ item.map_x }}%, 86%); top: clamp(14%, {{ item.map_y }}%, 86%);">
+              <button type="button" class="ov3-bubble {{ item.quadrant_tone }} {% if overall_summary.top_priority_category and item.name == overall_summary.top_priority_category.name %}is-active{% endif %}" data-map-category="{{ item.name }}" title="{{ item.name }} / 理解度{{ item.term_rate }}% / 通常{{ item.normal_rate }}% / 試験{{ item.exam_rate }}" aria-label="{{ item.name }}"></button>
+            </div>
+          {% endfor %}
+          {% for item in overall_recommendations %}
+            {% if loop.index <= 4 %}
+              <button type="button" class="ov3-map-label label-{{ loop.index }} {% if item.map_x > 60 %}label-left{% endif %} {{ item.quadrant_tone }} {% if overall_summary.top_priority_category and item.name == overall_summary.top_priority_category.name %}is-active{% endif %}" data-map-category="{{ item.name }}" style="left: clamp(18%, {{ item.map_x }}%, 82%); top: clamp(18%, {{ item.map_y }}%, 82%);" title="{{ item.name }}">
+                <i></i><span>{{ item.name }}</span>
+              </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="ov3-recommend-card">
+        <div class="ov3-card-head">
+          <div>
+            <h2>おすすめ復習（上位カテゴリから分析）</h2>
+            <p>優先度の高いカテゴリをもとに、効果的な復習を提案します。</p>
+          </div>
+          <a href="#overall-guide">選び方</a>
+        </div>
+        <div class="ov3-recommend-list">
+          <div class="ov3-selected-panel">
+            {% for item in overall_categories %}
+              <article class="ov3-selected-card {% if overall_summary.top_priority_category and item.name == overall_summary.top_priority_category.name %}is-active{% endif %}" data-map-detail="{{ item.name }}">
+                <div>
+                  <span>{{ item.quadrant }}</span>
+                  <strong>{{ item.name }}</strong>
+                </div>
+                <div class="compact-metrics">
+                  <span>理解度 <strong>{{ item.term_rate }}%</strong></span>
+                  <span>通常 <strong>{{ item.normal_rate }}%</strong></span>
+                  <span>試験 <strong>{{ item.exam_rate }}%</strong></span>
+                </div>
+                <p>{{ item.reason }}</p>
+              </article>
+            {% endfor %}
+          </div>
+          {% for item in overall_recommendations %}
+            <article class="ov3-recommend-item {{ item.quadrant_tone }} {% if loop.first %}is-active{% endif %}" data-recommend-category="{{ item.name }}">
+              <b>{{ loop.index }}</b>
+              <div class="ov3-recommend-main">
+                <h3>{{ item.name }} <span>{{ item.quadrant }}</span></h3>
+                <p>{{ item.reason }}</p>
+              </div>
+              <div class="ov3-recommend-metrics">
+                <span>理解度 <strong>{{ item.term_rate }}%</strong></span>
+                <span>正答率 <strong>{{ item.normal_rate }}%</strong></span>
+                <span>優先度 <strong>{{ item.priority_star_text }}</strong></span>
+              </div>
+            </article>
+          {% else %}
+            <div class="empty-analysis">分析に必要なカテゴリデータがまだありません。</div>
+          {% endfor %}
+        </div>
+        <div class="ov3-recommend-actions">
+          <div class="ov3-recommend-note">
+            <strong>上位カテゴリを含む全分野から出題！</strong>
+            <span>複数カテゴリを横断して復習し、総合的な実力を伸ばします。</span>
+          </div>
+          <a href="{{ url_for('flashcards', category=overall_summary.recommended_category_param, limit=20, random=1, direction='term_to_meaning') }}" class="ov3-action green">フラッシュカードで復習 <span>›</span></a>
+          <a href="{{ url_for('practice_quiz', mode='category', category=overall_summary.recommended_category_param, limit=20, reset=1, start=1) }}" class="ov3-action blue">問題演習で復習 <span>›</span></a>
+        </div>
+        <small>TOP3カテゴリを中心に、複数カテゴリを組み合わせてランダム出題します。</small>
+      </section>
+    </div>
+
+    <details class="ov3-detail-card" id="overall-detail">
+      <summary class="ov3-detail-summary">
+        <div>
+          <h2>詳細分析</h2>
+          <p>分析項目を選択すると、下の内容だけ切り替わります。</p>
+        </div>
+        <aside id="overall-guide" class="ov3-guide">
+          <strong>判定の見方</strong>
+          <span><i class="assumed"></i>理解したつもり: 理解度は高いが、正答率が低い</span>
+          <span><i class="practical"></i>実力派: 理解度・正答率ともに高い</span>
+          <b>⌄</b>
+        </aside>
+      </summary>
+      <div class="ov3-detail-body">
+      <div class="analysis-chip-row" role="tablist" aria-label="総合分析 詳細分析">
+        {% for key, label in [
+          ('overall-gap','理解度と正答率の差'),
+          ('overall-practice-gap','通常演習と試験モードの差'),
+          ('overall-weak','総合苦手カテゴリTOP5'),
+          ('overall-assumed','理解したつもりカテゴリ'),
+          ('overall-exam-loss','本番で失点するカテゴリ'),
+          ('overall-practical','実力派カテゴリ'),
+          ('overall-growth','成長カテゴリ')
+        ] %}
+          <button type="button" class="analysis-chip {% if loop.first %}is-active{% endif %}" data-overall-analysis-tab="{{ key }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="overall-analysis-content is-active" data-overall-analysis-panel="overall-gap">
+        <div class="overall-analysis-table">
+          <div class="overall-analysis-head"><span>順位</span><span>カテゴリ</span><span>理解度</span><span>正答率</span><span>差</span><span>判定</span><span>おすすめアクション</span></div>
+          {% for item in overall_gap_ranking %}
+            <div class="overall-analysis-row" {% if loop.index > 5 %}data-extra-analysis{% endif %}>
+              <b>{{ loop.index }}</b><strong>{{ item.name }}</strong>
+              <i><em class="blue" style="width: {{ item.term_rate }}%;"></em></i>
+              <i><em class="green" style="width: {{ item.answer_rate }}%;"></em></i>
+              <span>{{ item.gap }}pt</span><mark class="{{ item.quadrant_tone }}">{{ item.quadrant }}</mark><p>{{ item.action }}</p>
+            </div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-practice-gap">
+        <div class="mini-rank-grid">
+          {% for item in overall_practice_gap_ranking %}
+            <div class="mini-rank-card blue" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.normal_rate }}%;"></em></i><span>通常 {{ item.normal_rate }}% / 試験 {{ item.exam_rate }}% / 差 {{ item.practice_gap }}pt</span></div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-weak">
+        <div class="mini-rank-grid">
+          {% for item in overall_weak_ranking %}
+            <div class="mini-rank-card red" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.priority_width }}%;"></em></i><span>{{ item.reason }}</span></div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-assumed">
+        <div class="mini-rank-grid">
+          {% for item in assumed_categories %}
+            <div class="mini-rank-card amber" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.term_rate }}%;"></em></i><span>理解度 {{ item.term_rate }}% / 正答率 {{ item.answer_rate }}%</span></div>
+          {% else %}
+            <div class="empty-analysis">理解したつもりカテゴリはありません。</div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-exam-loss">
+        <div class="mini-rank-grid">
+          {% for item in exam_loss_categories %}
+            <div class="mini-rank-card red" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.exam_rate }}%;"></em></i><span>試験モード {{ item.exam_rate }}% / 理解度 {{ item.term_rate }}%</span></div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-practical">
+        <div class="mini-rank-grid">
+          {% for item in practical_categories %}
+            <div class="mini-rank-card green" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.answer_rate }}%;"></em></i><span>正答率 {{ item.answer_rate }}% / 理解度 {{ item.term_rate }}%</span></div>
+          {% else %}
+            <div class="empty-analysis">実力派カテゴリはまだありません。</div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      <div class="overall-analysis-content" data-overall-analysis-panel="overall-growth">
+        <div class="mini-rank-grid">
+          {% for item in overall_growth_categories %}
+            <div class="mini-rank-card green" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.answer_rate }}%;"></em></i><span>総合スコア {{ item.answer_rate }}% / 理解度 {{ item.term_rate }}%</span></div>
+          {% endfor %}
+        </div>
+        <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
+      </div>
+      </div>
+    </details>
+  </section>
+</div>
+
+<style>
+  .stats-page {
+    display: grid;
+    gap: 12px;
+  }
+  .stats-tabs {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border-bottom: 1px solid #dbe3ef;
+    padding: 0 8px;
+  }
+  .stats-tab {
+    position: relative;
+    padding: 10px 34px 12px;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .stats-tab.is-active {
+    color: #2563eb;
+  }
+  .stats-tab.is-active::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 3px;
+    border-radius: 999px 999px 0 0;
+    background: #2563eb;
+  }
+  .stats-tab-panel {
+    display: none;
+  }
+  .stats-tab-panel.is-active {
+    display: grid;
+    gap: 12px;
+  }
+  .overall-card,
+  .review-card,
+  .trend-card,
+  .detail-card,
+  .placeholder-panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 14px 42px -38px rgba(15, 23, 42, .7);
+  }
+  .overall-card {
+    display: grid;
+    grid-template-columns: 390px repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    align-items: center;
+    padding: 18px 20px;
+  }
+  .overall-left h2,
+  .card-head h2,
+  .detail-head h2 {
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 950;
+  }
+  .donut-row {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-top: 10px;
+  }
+  .summary-donut {
+    position: relative;
+    display: grid;
+    width: 132px;
+    height: 132px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+  }
+  .summary-donut::after {
+    content: "";
+    position: absolute;
+    inset: 31px;
+    border-radius: 999px;
+    background: #fff;
+  }
+  .summary-donut div {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+  }
+  .summary-donut strong {
+    display: block;
+    color: #0f172a;
+    font-size: 31px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .summary-donut span {
+    display: block;
+    margin-top: 5px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .donut-legend {
+    display: grid;
+    gap: 8px;
+    min-width: 165px;
+  }
+  .donut-legend span {
+    display: grid;
+    grid-template-columns: 12px 70px 54px 1fr;
+    gap: 8px;
+    align-items: center;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .donut-legend i {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+  }
+  .donut-legend .green i { background: #10b981; }
+  .donut-legend .amber i { background: #f59e0b; }
+  .donut-legend .rose i { background: #ef4444; }
+  .donut-legend em {
+    color: #475569;
+    font-size: 12px;
+    font-style: normal;
+  }
+  .summary-metric {
+    min-height: 132px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .summary-metric.blue { background: linear-gradient(135deg, #f8fbff, #fff); }
+  .summary-metric.green { background: linear-gradient(135deg, #ecfdf5, #fff); }
+  .summary-metric.amber { background: linear-gradient(135deg, #fffbeb, #fff); }
+  .summary-metric.rose { background: linear-gradient(135deg, #fff1f2, #fff); }
+  .summary-metric > span {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 950;
+  }
+  .summary-metric.blue > span { background: #eff6ff; color: #2563eb; }
+  .summary-metric.green > span { background: #dcfce7; color: #059669; }
+  .summary-metric.amber > span { background: #fef3c7; color: #d97706; }
+  .summary-metric.rose > span { background: #fee2e2; color: #dc2626; }
+  .summary-metric p {
+    margin-top: 12px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .summary-metric strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 30px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .summary-metric small,
+  .summary-metric em {
+    color: #334155;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 900;
+  }
+  .middle-grid {
+    display: grid;
+    grid-template-columns: 370px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .review-card,
+  .trend-card,
+  .detail-card {
+    padding: 16px 18px;
+  }
+  .card-head,
+  .trend-head,
+  .detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .card-head > span {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .review-count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 15px;
+    color: #f59e0b;
+  }
+  .review-count span {
+    display: inline-flex;
+    width: 46px;
+    height: 46px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #fffbeb;
+    font-size: 24px;
+    font-weight: 950;
+  }
+  .review-count strong {
+    color: #f59e0b;
+    font-size: 38px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .review-count small {
+    margin-left: 4px;
+    font-size: 16px;
+  }
+  .review-card > p {
+    margin: 10px auto 0;
+    max-width: 260px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1.65;
+    text-align: center;
+  }
+  .review-breakdown {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .review-breakdown div {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+  }
+  .review-breakdown .red { background: #fff1f2; color: #dc2626; }
+  .review-breakdown .amber { background: #fffbeb; color: #d97706; }
+  .review-breakdown span,
+  .review-card small {
+    display: block;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .review-breakdown strong {
+    display: block;
+    margin-top: 3px;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .review-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+    border-radius: 12px;
+    background: #2563eb;
+    padding: 13px 18px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .review-card small {
+    margin-top: 8px;
+    color: #64748b;
+    text-align: center;
+  }
+  .period-tabs {
+    display: flex;
+    gap: 4px;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .period-tabs button {
+    min-width: 56px;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .period-tabs button.is-active {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+  .trend-chart-wrap {
+    margin-top: 10px;
+  }
+  .trend-chart {
+    display: none;
+    width: 100%;
+    height: 165px;
+  }
+  .trend-chart.is-active {
+    display: block;
+  }
+  .trend-chart line {
+    stroke: #e2e8f0;
+    stroke-width: 1;
+  }
+  .trend-chart polygon {
+    fill: #dbeafe;
+    opacity: .5;
+  }
+  .trend-chart polyline {
+    fill: none;
+    stroke: #2563eb;
+    stroke-width: 3;
+  }
+  .trend-chart circle {
+    fill: #fff;
+    stroke: #2563eb;
+    stroke-width: 2.5;
+  }
+  .trend-chart text {
+    fill: #334155;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .trend-stat-set {
+    display: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .trend-stat-set.is-active {
+    display: grid;
+  }
+  .trend-stat-set article {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+  .trend-stat-set article.green {
+    background: #ecfdf5;
+  }
+  .trend-stat-set span {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .trend-stat-set strong {
+    display: block;
+    margin-top: 4px;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .trend-stat-set .green strong {
+    color: #059669;
+  }
+  .detail-card {
+    min-height: 245px;
+  }
+  .detail-head p {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .analysis-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .analysis-chip {
+    border: 1px solid #dbe3ef;
+    border-radius: 999px;
+    background: #fff;
+    padding: 7px 13px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .analysis-chip.is-active {
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #fff;
+  }
+  .analysis-content {
+    display: none;
+    margin-top: 12px;
+  }
+  .analysis-content.is-active {
+    display: block;
+  }
+  .analysis-table {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  .analysis-table-head,
+  .analysis-row {
+    display: grid;
+    grid-template-columns: 60px minmax(220px, 1fr) minmax(160px, .7fr) 170px 110px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 14px;
+  }
+  .analysis-table-head {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .analysis-row {
+    border-top: 1px solid #e2e8f0;
+  }
+  .analysis-row b {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .analysis-row strong,
+  .analysis-row span {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .analysis-row i,
+  .mini-rank-card i {
+    display: block;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .analysis-row em,
+  .mini-rank-card em {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #ef4444;
+  }
+  .analysis-row mark {
+    width: fit-content;
+    border-radius: 999px;
+    background: #fee2e2;
+    padding: 4px 10px;
+    color: #dc2626;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .mini-rank-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mini-rank-card {
+    display: grid;
+    gap: 8px;
+    min-height: 88px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .mini-rank-card b {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .mini-rank-card strong {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .mini-rank-card span {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 850;
+  }
+  .mini-rank-card.green em { background: #10b981; }
+  .mini-rank-card.red em { background: #ef4444; }
+  .mini-rank-card.amber em { background: #f59e0b; }
+  .breakdown-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .breakdown-row {
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) minmax(180px, 1fr) 90px;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 12px;
+  }
+  .breakdown-row strong,
+  .breakdown-row em {
+    color: #334155;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 900;
+  }
+  .analysis-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .analysis-toolbar label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .analysis-toolbar select {
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #fff;
+    padding: 7px 12px;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .term-analysis-table {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+  }
+  .term-analysis-head,
+  .term-analysis-row {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  .weak-term-table .term-analysis-head,
+  .weak-term-table .term-analysis-row {
+    grid-template-columns: 46px minmax(170px, 1.2fr) minmax(120px, .8fr) 86px 64px 64px 64px 100px 116px;
+    min-width: 980px;
+  }
+  .category-term-table .term-analysis-head,
+  .category-term-table .term-analysis-row {
+    grid-template-columns: minmax(160px, 1fr) 72px 68px 68px 68px 68px 72px 82px minmax(130px, .8fr);
+    min-width: 920px;
+  }
+  .review-term-table .term-analysis-head,
+  .review-term-table .term-analysis-row {
+    grid-template-columns: minmax(160px, 1.1fr) minmax(120px, .7fr) 78px 96px 62px 62px 62px 62px 90px 68px;
+    min-width: 1040px;
+  }
+  .growth-term-table .term-analysis-head,
+  .growth-term-table .term-analysis-row {
+    grid-template-columns: minmax(180px, 1.3fr) minmax(130px, .8fr) 90px 90px 130px 72px 130px;
+    min-width: 860px;
+  }
+  .forgetting-term-table .term-analysis-head,
+  .forgetting-term-table .term-analysis-row {
+    grid-template-columns: minmax(180px, 1.3fr) minmax(130px, .8fr) 100px 62px 92px 92px 72px 106px 68px;
+    min-width: 980px;
+  }
+  .term-analysis-head {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .term-analysis-row {
+    border-top: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .term-analysis-row strong {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 950;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .term-analysis-row em {
+    color: #0f172a;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 950;
+    text-align: right;
+  }
+  .term-analysis-row > b {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .term-analysis-row > b.rank-top {
+    background: linear-gradient(135deg, #f59e0b, #fb7185);
+    color: #fff;
+  }
+  .term-analysis-row mark {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+  .status-green { background: #dcfce7; color: #047857; }
+  .status-amber { background: #fef3c7; color: #b45309; }
+  .status-rose { background: #fee2e2; color: #dc2626; }
+  .status-blue { background: #dbeafe; color: #2563eb; }
+  .status-slate { background: #f1f5f9; color: #475569; }
+  .term-analysis-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: #eff6ff;
+    padding: 6px 8px;
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 950;
+    text-align: center;
+  }
+  .term-progress {
+    display: block;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .term-progress u {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #10b981);
+    text-decoration: none;
+  }
+  .stack-bar {
+    display: flex;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .stack-bar i.green { background: #10b981; }
+  .stack-bar i.amber { background: #f59e0b; }
+  .stack-bar i.rose { background: #fb7185; }
+  .practice-mode-tabs {
+    display: inline-flex;
+    width: fit-content;
+    gap: 4px;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background: #fff;
+    padding: 4px;
+  }
+  .practice-mode-tabs button {
+    min-width: 112px;
+    border-radius: 9px;
+    padding: 8px 18px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .practice-mode-tabs button.is-active {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 10px 24px -18px rgba(37, 99, 235, .9);
+  }
+  .practice-mode-panel {
+    display: none;
+    gap: 12px;
+  }
+  .practice-mode-panel.is-active {
+    display: grid;
+  }
+  .practice-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    padding: 18px;
+    box-shadow: 0 14px 42px -38px rgba(15, 23, 42, .7);
+  }
+  .practice-summary-card {
+    min-height: 126px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .practice-summary-card.blue { background: linear-gradient(135deg, #eff6ff, #fff); }
+  .practice-summary-card.green { background: linear-gradient(135deg, #ecfdf5, #fff); }
+  .practice-summary-card.red { background: linear-gradient(135deg, #fff1f2, #fff); }
+  .practice-summary-card.slate { background: linear-gradient(135deg, #f8fafc, #fff); }
+  .summary-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .summary-title span {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 10px;
+  }
+  .practice-summary-card strong {
+    display: block;
+    margin-top: 12px;
+    color: #0f172a;
+    font-size: 34px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .practice-summary-card small {
+    margin-left: 3px;
+    font-size: 16px;
+  }
+  .practice-summary-card p {
+    margin-top: 10px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .practice-summary-card.green strong { color: #059669; }
+  .practice-summary-card.red strong { color: #dc2626; }
+  .practice-middle-grid {
+    grid-template-columns: 390px minmax(0, 1fr);
+  }
+  .practice-review-card {
+    background: linear-gradient(135deg, #fff7ed, #fff);
+  }
+  .review-button.is-disabled {
+    cursor: not-allowed;
+    background: #cbd5e1;
+    color: #f8fafc;
+  }
+  .practice-analysis-content {
+    display: none;
+    margin-top: 12px;
+  }
+  .practice-analysis-content.is-active {
+    display: block;
+  }
+  .practice-analysis-table {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  .practice-analysis-head,
+  .practice-analysis-row {
+    display: grid;
+    grid-template-columns: 48px 78px minmax(260px, 1.35fr) minmax(140px, .65fr) 140px 130px 110px 110px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  .practice-analysis-head {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .practice-analysis-row {
+    border-top: 1px solid #e2e8f0;
+  }
+  .practice-analysis-row b {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .practice-analysis-row strong,
+  .practice-analysis-row span,
+  .practice-analysis-row em,
+  .practice-analysis-row p {
+    min-width: 0;
+    color: #0f172a;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 900;
+  }
+  .practice-analysis-row > span:not(.practice-rate) {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.45;
+  }
+  .practice-rate {
+    display: grid;
+    grid-template-columns: minmax(54px, 1fr) 40px;
+    gap: 8px;
+    align-items: center;
+  }
+  .practice-rate i {
+    display: block;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .practice-rate small {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #ef4444;
+  }
+  .practice-rate mark {
+    background: transparent;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .practice-detail-table {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+  }
+  .practice-detail-head,
+  .practice-detail-row {
+    display: grid;
+    gap: 9px;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  .practice-weak-table .practice-detail-head,
+  .practice-weak-table .practice-detail-row {
+    grid-template-columns: 44px 72px minmax(260px, 1.5fr) minmax(120px, .8fr) 98px 112px 100px 64px;
+  }
+  .practice-category-table .practice-detail-head,
+  .practice-category-table .practice-detail-row {
+    grid-template-columns: minmax(210px, 1.3fr) 92px 70px 70px 86px minmax(180px, 1fr);
+  }
+  .practice-priority-table .practice-detail-head,
+  .practice-priority-table .practice-detail-row {
+    grid-template-columns: 44px 78px minmax(190px, 1.2fr) 92px 92px 110px 64px;
+  }
+  .practice-growth-table .practice-detail-head,
+  .practice-growth-table .practice-detail-row {
+    grid-template-columns: 44px 78px minmax(220px, 1.2fr) 130px 130px 88px;
+  }
+  .practice-never-table .practice-detail-head,
+  .practice-never-table .practice-detail-row {
+    grid-template-columns: 44px 78px minmax(260px, 1.4fr) 90px 110px 64px;
+  }
+  .practice-detail-head {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .practice-detail-row {
+    border-top: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .practice-detail-row strong,
+  .practice-detail-row p {
+    margin: 0;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .practice-detail-row p {
+    text-align: right;
+  }
+  .question-snippet {
+    display: -webkit-box;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .rank-badge {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .rank-badge.rank-1 { background: linear-gradient(135deg, #facc15, #f59e0b); color: #78350f; }
+  .rank-badge.rank-2 { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #0f172a; }
+  .rank-badge.rank-3 { background: linear-gradient(135deg, #fdba74, #c2410c); color: #fff; }
+  .category-badge {
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 999px;
+    background: #eff6ff;
+    padding: 4px 9px;
+    color: #2563eb;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 950;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .category-badge.green { background: #dcfce7; color: #047857; }
+  .category-badge.amber { background: #fef3c7; color: #b45309; }
+  .category-badge.rose { background: #fee2e2; color: #dc2626; }
+  .accuracy-pill {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+  .accuracy-green { background: #dcfce7; color: #047857; }
+  .accuracy-amber { background: #fef3c7; color: #b45309; }
+  .accuracy-rose { background: #fee2e2; color: #dc2626; }
+  .practice-detail-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: #eff6ff;
+    padding: 6px 8px;
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .practice-progress {
+    display: block;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .practice-progress u {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #10b981);
+    text-decoration: none;
+  }
+  .empty-analysis {
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 24px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 900;
+    text-align: center;
+  }
+  .overall-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .overall-summary-card,
+  .category-map-card,
+  .recommend-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 14px 42px -38px rgba(15, 23, 42, .7);
+  }
+  .overall-summary-card {
+    position: relative;
+    min-height: 128px;
+    padding: 16px 18px 14px 78px;
+  }
+  .overall-summary-card > span {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 22px;
+    font-weight: 950;
+  }
+  .overall-summary-card.blue > span { background: #dbeafe; color: #2563eb; }
+  .overall-summary-card.amber > span { background: #fef3c7; color: #d97706; }
+  .overall-summary-card.green > span { background: #dcfce7; color: #059669; }
+  .overall-summary-card.violet > span { background: #ede9fe; color: #7c3aed; }
+  .overall-summary-card p {
+    margin-top: 10px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .overall-summary-card strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 30px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .overall-summary-card small {
+    margin-left: 5px;
+    font-size: 14px;
+  }
+  .overall-summary-card em {
+    display: block;
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 850;
+  }
+  .overall-summary-card .label-strong {
+    color: #0f172a;
+    font-size: 24px;
+    line-height: 1.2;
+  }
+  .overall-summary-card.amber .label-strong { color: #d97706; }
+  .overall-summary-card.green .label-strong { color: #059669; }
+  .overall-summary-card.violet .label-strong { color: #7c3aed; }
+  .summary-pill,
+  .summary-link,
+  .summary-start {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .summary-pill {
+    background: #ede9fe;
+    color: #6d28d9;
+  }
+  .summary-link {
+    background: #ffedd5;
+    color: #ea580c;
+  }
+  .summary-start {
+    background: #dcfce7;
+    color: #047857;
+  }
+  .summary-sparkline {
+    width: 100%;
+    height: 32px;
+    margin-top: 8px;
+  }
+  .summary-sparkline polyline {
+    fill: none;
+    stroke: #2563eb;
+    stroke-width: 3;
+  }
+  .overall-main-grid {
+    display: grid;
+    grid-template-columns: minmax(460px, .9fr) minmax(0, 1.35fr);
+    gap: 12px;
+  }
+  .category-map-card,
+  .recommend-card {
+    padding: 16px 18px;
+  }
+  .help-dot {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .category-map {
+    position: relative;
+    height: 318px;
+    margin-top: 12px;
+    overflow: hidden;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background:
+      linear-gradient(90deg, transparent calc(50% - .5px), #cbd5e1 calc(50% - .5px), #cbd5e1 calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(0deg, transparent calc(50% - .5px), #cbd5e1 calc(50% - .5px), #cbd5e1 calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(135deg, rgba(16,185,129,.1), rgba(37,99,235,.08) 48%, rgba(251,191,36,.1));
+  }
+  .map-quadrant {
+    position: absolute;
+    display: grid;
+    gap: 2px;
+    color: #0f172a;
+    font-size: 11px;
+    font-weight: 900;
+    pointer-events: none;
+  }
+  .map-quadrant strong {
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .map-quadrant span {
+    color: #64748b;
+  }
+  .map-quadrant.top-left { top: 14px; left: 16px; }
+  .map-quadrant.top-right { top: 14px; right: 16px; text-align: right; }
+  .map-quadrant.bottom-left { bottom: 16px; left: 16px; }
+  .map-quadrant.bottom-right { right: 16px; bottom: 16px; text-align: right; }
+  .map-axis {
+    position: absolute;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .x-axis {
+    right: 14px;
+    bottom: 50%;
+    transform: translateY(26px);
+  }
+  .y-axis {
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .map-bubble {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: translate(-50%, -50%);
+    border: 3px solid #fff;
+    border-radius: 999px;
+    padding: 6px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1.15;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(15, 23, 42, .55);
+    box-shadow: 0 14px 28px -16px rgba(15, 23, 42, .95);
+    transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+  }
+  .map-bubble:hover,
+  .map-bubble.is-active {
+    z-index: 5;
+    transform: translate(-50%, -50%) scale(1.16);
+    box-shadow: 0 18px 34px -12px rgba(15, 23, 42, .9), 0 0 0 5px rgba(37, 99, 235, .16);
+    filter: saturate(1.15);
+  }
+  .map-bubble.assumed { background: #dc2626; }
+  .map-bubble.practical { background: #047857; }
+  .map-bubble.weak { background: #6d28d9; }
+  .map-bubble.stable { background: #1d4ed8; }
+  .recommend-card .detail-head a {
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .recommend-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 10px;
+  }
+  .map-selected-panel {
+    display: none;
+    grid-column: 1 / -1;
+  }
+  .map-selected-panel.is-open {
+    display: grid;
+  }
+  .map-selected-card {
+    display: none;
+    grid-template-columns: minmax(160px, .7fr) minmax(220px, 1fr) minmax(220px, 1fr);
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eff6ff, #fff);
+    padding: 10px 12px;
+  }
+  .map-selected-card.is-active {
+    display: grid;
+  }
+  .map-selected-card div:first-child {
+    display: grid;
+    gap: 3px;
+  }
+  .map-selected-card > div:first-child > span {
+    width: fit-content;
+    border-radius: 999px;
+    background: #dbeafe;
+    padding: 3px 8px;
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 950;
+  }
+  .map-selected-card strong {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  .map-selected-card p {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.4;
+  }
+  .recommend-item {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: 10px;
+    min-height: 174px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    padding: 14px 14px 12px;
+    transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  }
+  .recommend-item.is-active {
+    border-color: #2563eb;
+    box-shadow: 0 14px 28px -22px rgba(37, 99, 235, .95), inset 0 3px 0 #2563eb;
+  }
+  .recommend-item > b {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .recommend-item:nth-of-type(2) > b { background: #f59e0b; }
+  .recommend-item:nth-of-type(3) > b { background: #7c3aed; }
+  .recommend-item h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: -30px;
+    padding-left: 34px;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .recommend-item h3 span {
+    border-radius: 999px;
+    background: #fee2e2;
+    padding: 3px 8px;
+    color: #dc2626;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .compact-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .compact-metrics span {
+    display: grid;
+    gap: 3px;
+    min-height: 54px;
+    align-content: center;
+    border-radius: 999px;
+    background: #f8fafc;
+    padding: 8px 6px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 900;
+    text-align: center;
+  }
+  .compact-metrics strong {
+    display: block;
+    margin-left: 0;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .recommend-item p {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    border-radius: 10px;
+    background: #fff7ed;
+    padding: 10px;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.45;
+  }
+  .recommend-item p i {
+    display: inline-block;
+    margin-right: 8px;
+    color: #92400e;
+    font-style: normal;
+    font-weight: 950;
+  }
+  .recommend-actions {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.1fr) 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+    border-radius: 14px;
+    border: 1px solid #fed7aa;
+    background: linear-gradient(135deg, #fff7ed, #eff6ff);
+    padding: 12px;
+  }
+  .recommend-note {
+    display: grid;
+    gap: 4px;
+    align-content: center;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .recommend-note strong {
+    color: #c2410c;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .recommend-note span {
+    color: #92400e;
+    font-size: 11px;
+  }
+  .overall-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #fff !important;
+    font-size: 14px;
+    font-weight: 950;
+    box-shadow: 0 18px 34px -22px rgba(15, 23, 42, .95);
+  }
+  .overall-action.green { background: linear-gradient(135deg, #10b981, #059669); }
+  .overall-action.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .overall-action span {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255,255,255,.2);
+    font-size: 18px;
+  }
+  .recommend-card > small {
+    display: block;
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 850;
+    text-align: center;
+  }
+  .judgement-guide {
+    display: grid;
+    gap: 5px;
+    min-width: 235px;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #eff6ff;
+    padding: 10px 12px;
+  }
+  .judgement-guide strong {
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .judgement-guide span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 850;
+  }
+  .judgement-guide i {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+  }
+  .judgement-guide .assumed { background: #ef4444; }
+  .judgement-guide .practical { background: #059669; }
+  .judgement-guide .stable { background: #2563eb; }
+  .overall-analysis-content {
+    display: none;
+    margin-top: 12px;
+  }
+  .overall-analysis-content.is-active {
+    display: block;
+  }
+  .overall-analysis-content.is-expanded [data-extra-analysis] {
+    display: grid;
+  }
+  .overall-analysis-table {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  .overall-analysis-head,
+  .overall-analysis-row {
+    display: grid;
+    grid-template-columns: 52px minmax(160px, 1fr) 180px 180px 80px 130px minmax(220px, 1.2fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  .overall-analysis-head {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .overall-analysis-row {
+    border-top: 1px solid #e2e8f0;
+  }
+  .overall-analysis-row[data-extra-analysis],
+  .mini-rank-card[data-extra-analysis] {
+    display: none;
+  }
+  .overall-analysis-row b {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .overall-analysis-row strong,
+  .overall-analysis-row span,
+  .overall-analysis-row p {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .overall-analysis-row i {
+    display: block;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+  .overall-analysis-row em {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+  }
+  .overall-analysis-row em.blue { background: #2563eb; }
+  .overall-analysis-row em.green { background: #059669; }
+  .overall-analysis-row mark {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .overall-analysis-row mark.assumed { background: #fee2e2; color: #dc2626; }
+  .overall-analysis-row mark.practical { background: #dcfce7; color: #059669; }
+  .overall-analysis-row mark.weak { background: #ede9fe; color: #7c3aed; }
+  .overall-analysis-row mark.stable { background: #dbeafe; color: #2563eb; }
+  .show-more-analysis {
+    display: block;
+    margin: 10px auto 0;
+    border-radius: 999px;
+    background: #eff6ff;
+    padding: 7px 16px;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .overall-analysis-content.is-expanded .show-more-analysis {
+    background: #f8fafc;
+    color: #64748b;
+  }
+  [data-stats-panel="overall"].stats-tab-panel.is-active {
+    gap: 8px;
+  }
+  [data-stats-panel="overall"] .overall-summary-grid {
+    gap: 8px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card {
+    min-height: 94px;
+    padding: 10px 12px 10px 58px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card > span {
+    top: 12px;
+    left: 12px;
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card p {
+    margin-top: 3px;
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card strong {
+    margin-top: 4px;
+    font-size: 24px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card .label-strong {
+    font-size: 18px;
+    line-height: 1.15;
+  }
+  [data-stats-panel="overall"] .overall-summary-card em {
+    overflow: hidden;
+    display: -webkit-box;
+    margin-top: 5px;
+    font-size: 10px;
+    line-height: 1.25;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  [data-stats-panel="overall"] .summary-pill,
+  [data-stats-panel="overall"] .summary-link,
+  [data-stats-panel="overall"] .summary-start {
+    margin-top: 6px;
+    padding: 4px 9px;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .summary-sparkline {
+    height: 20px;
+    margin-top: 4px;
+  }
+  [data-stats-panel="overall"] .overall-main-grid {
+    grid-template-columns: minmax(380px, 40%) minmax(0, 60%);
+    gap: 12px;
+  }
+  [data-stats-panel="overall"] .category-map-card,
+  [data-stats-panel="overall"] .recommend-card {
+    padding: 14px 16px;
+  }
+  [data-stats-panel="overall"] .detail-head {
+    gap: 8px;
+  }
+  [data-stats-panel="overall"] .detail-head h2 {
+    font-size: 16px;
+  }
+  [data-stats-panel="overall"] .detail-head p,
+  [data-stats-panel="overall"] .recommend-card .detail-head a {
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .category-map {
+    height: 282px;
+    margin-top: 12px;
+  }
+  [data-stats-panel="overall"] .map-quadrant {
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .map-quadrant strong {
+    font-size: 12px;
+  }
+  [data-stats-panel="overall"] .map-quadrant.top-left,
+  [data-stats-panel="overall"] .map-quadrant.top-right {
+    top: 9px;
+  }
+  [data-stats-panel="overall"] .map-quadrant.bottom-left,
+  [data-stats-panel="overall"] .map-quadrant.bottom-right {
+    bottom: 10px;
+  }
+  [data-stats-panel="overall"] .map-bubble {
+    max-width: 70px;
+    font-size: 9px;
+    border-width: 2px;
+  }
+  [data-stats-panel="overall"] .recommend-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  [data-stats-panel="overall"] .map-selected-panel {
+    grid-column: auto;
+  }
+  [data-stats-panel="overall"] .recommend-item {
+    display: grid;
+    grid-template-columns: 34px minmax(170px, 1fr) minmax(270px, .92fr);
+    grid-template-rows: auto auto;
+    gap: 8px 12px;
+    min-height: 82px;
+    padding: 13px 16px;
+  }
+  [data-stats-panel="overall"] .recommend-item > b {
+    grid-row: 1 / 3;
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  [data-stats-panel="overall"] .recommend-main {
+    min-width: 0;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 {
+    margin-top: 0;
+    padding-left: 0;
+    justify-content: flex-start;
+    font-size: 15px;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 span {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .recommend-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+  [data-stats-panel="overall"] .recommend-metrics span {
+    display: grid;
+    gap: 2px;
+    min-height: 44px;
+    align-content: center;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 5px 4px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 900;
+    text-align: center;
+  }
+  [data-stats-panel="overall"] .recommend-metrics strong {
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .recommend-item p {
+    grid-column: 2;
+    overflow: hidden;
+    display: -webkit-box;
+    margin: 0;
+    background: transparent;
+    padding: 0;
+    color: #334155;
+    font-size: 11px;
+    line-height: 1.5;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  [data-stats-panel="overall"] .recommend-actions {
+    grid-template-columns: minmax(210px, 1fr) minmax(170px, .85fr) minmax(170px, .85fr);
+    gap: 9px;
+    margin-top: 12px;
+    padding: 10px;
+  }
+  [data-stats-panel="overall"] .recommend-note {
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .recommend-note strong {
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .recommend-note span,
+  [data-stats-panel="overall"] .recommend-card > small {
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .overall-action {
+    border-radius: 10px;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+  [data-stats-panel="overall"] .overall-action span {
+    width: 20px;
+    height: 20px;
+    font-size: 15px;
+  }
+  [data-stats-panel="overall"] .recommend-card > small {
+    margin-top: 5px;
+  }
+  [data-stats-panel="overall"] .overall-detail-card {
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    cursor: pointer;
+    padding: 14px 16px;
+    list-style: none;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary::-webkit-details-marker {
+    display: none;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary h2 {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary p {
+    color: #475569;
+    font-size: 11px;
+    font-weight: 850;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary > span {
+    border-radius: 999px;
+    background: #eff6ff;
+    padding: 6px 12px;
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .overall-detail-card[open] .overall-detail-summary {
+    border-bottom: 1px solid #e2e8f0;
+  }
+  [data-stats-panel="overall"] .judgement-guide {
+    margin: 10px 12px 0;
+    border-color: #dbeafe;
+    padding: 0;
+  }
+  [data-stats-panel="overall"] .judgement-guide summary {
+    cursor: pointer;
+    padding: 8px 10px;
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .judgement-guide div {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+    gap: 6px 10px;
+    min-width: 0;
+    border-top: 1px solid #dbeafe;
+    padding: 8px 10px;
+  }
+  [data-stats-panel="overall"] .judgement-guide strong {
+    grid-column: 1 / -1;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .judgement-guide span {
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .analysis-chip-row {
+    gap: 5px;
+    margin: 10px 12px 0;
+  }
+  [data-stats-panel="overall"] .analysis-chip {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-content {
+    margin: 8px 12px 12px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-head,
+  [data-stats-panel="overall"] .overall-analysis-row {
+    grid-template-columns: 40px minmax(130px, 1fr) 130px 130px 62px 105px minmax(150px, 1.1fr);
+    gap: 7px;
+    padding: 6px 9px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-head {
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-row b {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-row strong,
+  [data-stats-panel="overall"] .overall-analysis-row span,
+  [data-stats-panel="overall"] .overall-analysis-row p {
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-row i {
+    height: 6px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-row mark {
+    padding: 3px 7px;
+    font-size: 9px;
+  }
+  [data-stats-panel="overall"] .mini-rank-grid {
+    gap: 6px;
+  }
+  [data-stats-panel="overall"] .mini-rank-card {
+    min-height: 62px;
+    gap: 5px;
+    padding: 7px;
+  }
+  [data-stats-panel="overall"].stats-tab-panel.is-active {
+    gap: 14px;
+  }
+  [data-stats-panel="overall"] .overall-summary-grid {
+    gap: 14px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card {
+    min-height: 132px;
+    border-color: #dce6f1;
+    border-radius: 16px;
+    padding: 18px 18px 16px 76px;
+    box-shadow: 0 14px 36px -34px rgba(15, 23, 42, .65);
+  }
+  [data-stats-panel="overall"] .overall-summary-card > span {
+    top: 18px;
+    left: 18px;
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card p {
+    margin-top: 0;
+    color: #0f172a;
+    font-size: 13px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card strong {
+    margin-top: 10px;
+    font-size: 32px;
+  }
+  [data-stats-panel="overall"] .overall-summary-card .label-strong {
+    font-size: 23px;
+    line-height: 1.2;
+  }
+  [data-stats-panel="overall"] .overall-summary-card em {
+    margin-top: 9px;
+    color: #475569;
+    font-size: 11px;
+    line-height: 1.55;
+    -webkit-line-clamp: 2;
+  }
+  [data-stats-panel="overall"] .summary-pill,
+  [data-stats-panel="overall"] .summary-link,
+  [data-stats-panel="overall"] .summary-start {
+    margin-top: 12px;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .summary-sparkline {
+    height: 30px;
+    margin-top: 10px;
+  }
+  [data-stats-panel="overall"] .overall-main-grid {
+    grid-template-columns: minmax(410px, 40%) minmax(0, 60%);
+    gap: 14px;
+  }
+  [data-stats-panel="overall"] .category-map-card,
+  [data-stats-panel="overall"] .recommend-card {
+    border-color: #dce6f1;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 14px 36px -34px rgba(15, 23, 42, .65);
+  }
+  [data-stats-panel="overall"] .detail-head h2 {
+    font-size: 18px;
+  }
+  [data-stats-panel="overall"] .detail-head p,
+  [data-stats-panel="overall"] .recommend-card .detail-head a {
+    margin-top: 5px;
+    color: #475569;
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .help-dot {
+    width: 30px;
+    height: 30px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 14px;
+  }
+  [data-stats-panel="overall"] .category-map {
+    height: 342px;
+    margin-top: 16px;
+    border-color: #dbe3ef;
+    border-radius: 14px;
+    background:
+      linear-gradient(90deg, transparent calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(0deg, transparent calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(135deg, rgba(16, 185, 129, .12), rgba(37, 99, 235, .08) 47%, rgba(239, 68, 68, .09));
+  }
+  [data-stats-panel="overall"] .map-quadrant {
+    gap: 3px;
+    color: #0f172a;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .map-quadrant strong {
+    font-size: 14px;
+  }
+  [data-stats-panel="overall"] .map-quadrant.top-left,
+  [data-stats-panel="overall"] .map-quadrant.top-right {
+    top: 16px;
+  }
+  [data-stats-panel="overall"] .map-quadrant.bottom-left,
+  [data-stats-panel="overall"] .map-quadrant.bottom-right {
+    bottom: 16px;
+  }
+  [data-stats-panel="overall"] .map-axis {
+    color: #0f172a;
+    font-size: 14px;
+  }
+  [data-stats-panel="overall"] .map-bubble {
+    max-width: 84px;
+    border-width: 3px;
+    padding: 5px;
+    font-size: 10px;
+    box-shadow: 0 12px 22px -14px rgba(15, 23, 42, .9);
+  }
+  [data-stats-panel="overall"] .recommend-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  [data-stats-panel="overall"] .recommend-item {
+    display: grid;
+    grid-template-columns: 42px minmax(240px, 1fr) minmax(300px, .86fr);
+    grid-template-rows: auto auto;
+    gap: 7px 14px;
+    min-height: 82px;
+    border-color: #dce6f1;
+    border-radius: 16px;
+    background: #fff;
+    padding: 14px 18px;
+    box-shadow: none;
+  }
+  [data-stats-panel="overall"] .recommend-item.is-active {
+    border-color: #dce6f1;
+    box-shadow: none;
+  }
+  [data-stats-panel="overall"] .recommend-item > b {
+    grid-row: 1 / 3;
+    width: 30px;
+    height: 30px;
+    background: #ef4444;
+    font-size: 13px;
+  }
+  [data-stats-panel="overall"] .recommend-item:nth-of-type(2) > b { background: #f59e0b; }
+  [data-stats-panel="overall"] .recommend-item:nth-of-type(3) > b { background: #7c3aed; }
+  [data-stats-panel="overall"] .recommend-main {
+    min-width: 0;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 {
+    justify-content: flex-start;
+    margin: 0;
+    padding: 0;
+    color: #0f172a;
+    font-size: 15px;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 span {
+    background: #fee2e2;
+    padding: 3px 9px;
+    color: #dc2626;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .recommend-item p {
+    grid-column: 2;
+    overflow: hidden;
+    display: -webkit-box;
+    margin: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    color: #475569;
+    font-size: 11px;
+    line-height: 1.55;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  [data-stats-panel="overall"] .recommend-metrics {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    align-self: center;
+  }
+  [data-stats-panel="overall"] .recommend-metrics span {
+    display: grid;
+    gap: 5px;
+    min-height: auto;
+    align-content: center;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 900;
+    text-align: left;
+  }
+  [data-stats-panel="overall"] .recommend-metrics strong {
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .recommend-metrics span:last-child strong {
+    color: #f97316;
+    font-size: 14px;
+    letter-spacing: .04em;
+  }
+  [data-stats-panel="overall"] .recommend-actions {
+    grid-template-columns: minmax(250px, 1fr) minmax(190px, .78fr) minmax(190px, .78fr);
+    gap: 12px;
+    margin-top: 16px;
+    border-color: #fed7aa;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fff7ed, #eff6ff);
+    padding: 12px 14px;
+  }
+  [data-stats-panel="overall"] .recommend-note {
+    gap: 4px;
+    color: #92400e;
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .recommend-note strong {
+    color: #c2410c;
+    font-size: 12px;
+  }
+  [data-stats-panel="overall"] .recommend-note span,
+  [data-stats-panel="overall"] .recommend-card > small {
+    color: #64748b;
+    font-size: 10px;
+  }
+  [data-stats-panel="overall"] .overall-action {
+    border-radius: 12px;
+    padding: 13px 15px;
+    font-size: 13px;
+  }
+  [data-stats-panel="overall"] .overall-action span {
+    width: 23px;
+    height: 23px;
+    font-size: 17px;
+  }
+  [data-stats-panel="overall"] .recommend-card > small {
+    margin-top: 10px;
+    text-align: center;
+  }
+  [data-stats-panel="overall"] .overall-detail-card {
+    min-height: 0;
+    overflow: hidden;
+    border-color: #dce6f1;
+    border-radius: 16px;
+    padding: 0;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, .72fr);
+    gap: 18px;
+    align-items: center;
+    cursor: pointer;
+    padding: 16px 18px;
+    list-style: none;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary::-webkit-details-marker {
+    display: none;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary h2 {
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary p {
+    margin-top: 4px;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 850;
+  }
+  [data-stats-panel="overall"] .judgement-guide {
+    display: grid;
+    grid-template-columns: auto auto auto 20px;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+    margin: 0;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #eff6ff;
+    padding: 12px 14px;
+  }
+  [data-stats-panel="overall"] .judgement-guide strong {
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  [data-stats-panel="overall"] .judgement-guide span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #334155;
+    font-size: 10px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+  [data-stats-panel="overall"] .judgement-guide i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+  }
+  [data-stats-panel="overall"] .judgement-guide b {
+    color: #2563eb;
+    font-size: 18px;
+    line-height: 1;
+  }
+  [data-stats-panel="overall"] .overall-detail-card[open] .overall-detail-summary {
+    border-bottom: 1px solid #e2e8f0;
+  }
+  [data-stats-panel="overall"] .overall-detail-body {
+    padding: 0 14px 14px;
+  }
+  [data-stats-panel="overall"] .analysis-chip-row {
+    gap: 6px;
+    margin: 12px 0 0;
+  }
+  [data-stats-panel="overall"] .analysis-chip {
+    padding: 6px 11px;
+    font-size: 11px;
+  }
+  [data-stats-panel="overall"] .overall-analysis-content {
+    margin: 10px 0 0;
+  }
+  [data-stats-panel="overall"] .show-more-analysis {
+    margin-top: 6px;
+    padding: 5px 12px;
+    font-size: 10px;
+  }
+  .placeholder-panel {
+    padding: 28px;
+  }
+  .placeholder-panel h2 {
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 950;
+  }
+  .placeholder-panel p {
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 850;
+  }
+  /* Overall analysis v3: isolated layout matching the provided desktop mock. */
+  .overall-v3.stats-tab-panel.is-active {
+    display: grid;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .overall-v3,
+  .overall-v3 * {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+  .ov3-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .ov3-summary-card,
+  .ov3-map-card,
+  .ov3-recommend-card,
+  .ov3-detail-card {
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 14px 36px -34px rgba(15, 23, 42, .65);
+  }
+  .ov3-summary-card {
+    position: relative;
+    height: 126px;
+    overflow: hidden;
+    padding: 15px 14px 12px 62px;
+  }
+  .ov3-summary-card > span {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  .ov3-summary-card.blue > span { background: #dbeafe; color: #2563eb; }
+  .ov3-summary-card.amber > span { background: #fef3c7; color: #d97706; }
+  .ov3-summary-card.green > span { background: #dcfce7; color: #059669; }
+  .ov3-summary-card.violet > span { background: #ede9fe; color: #7c3aed; }
+  .ov3-summary-card p {
+    color: #0f172a;
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1.25;
+  }
+  .ov3-summary-card strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 26px;
+    font-weight: 950;
+    line-height: 1;
+  }
+  .ov3-summary-card small {
+    margin-left: 4px;
+    font-size: 13px;
+  }
+  .ov3-label-strong {
+    overflow: hidden;
+    display: -webkit-box !important;
+    color: #0f172a;
+    font-size: 18px !important;
+    line-height: 1.18 !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .ov3-summary-card.amber .ov3-label-strong { color: #d97706; }
+  .ov3-summary-card.green .ov3-label-strong { color: #059669; }
+  .ov3-summary-card.violet .ov3-label-strong { color: #7c3aed; }
+  .ov3-summary-card em {
+    overflow: hidden;
+    display: -webkit-box;
+    margin-top: 5px;
+    color: #475569;
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 850;
+    line-height: 1.45;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .ov3-pill {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 6px;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 9px;
+    font-weight: 950;
+  }
+  .ov3-pill.violet { background: #ede9fe; color: #6d28d9; }
+  .ov3-pill.amber { background: #ffedd5; color: #ea580c; }
+  .ov3-pill.green { background: #dcfce7; color: #047857; }
+  .ov3-sparkline {
+    width: 100%;
+    height: 22px;
+    margin-top: 6px;
+  }
+  .ov3-sparkline polyline {
+    fill: none;
+    stroke: #2563eb;
+    stroke-width: 3;
+  }
+  .ov3-main-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 35%) minmax(0, 65%);
+    gap: 10px;
+    overflow: hidden;
+  }
+  .ov3-map-card,
+  .ov3-recommend-card {
+    height: 372px;
+    overflow: hidden;
+    padding: 14px 16px;
+  }
+  .ov3-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ov3-card-head h2 {
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 950;
+    line-height: 1.3;
+  }
+  .ov3-card-head p {
+    margin-top: 4px;
+    color: #475569;
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 1.45;
+  }
+  .ov3-card-head > span {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 950;
+  }
+  .ov3-card-head a {
+    color: #2563eb;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .ov3-map {
+    position: relative;
+    height: 286px;
+    margin-top: 10px;
+    overflow: hidden;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background:
+      linear-gradient(90deg, transparent calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(0deg, transparent calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% - .5px), rgba(148, 163, 184, .55) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(135deg, rgba(16,185,129,.12), rgba(37,99,235,.08) 47%, rgba(239,68,68,.08));
+  }
+  .ov3-quadrant {
+    position: absolute;
+    display: grid;
+    gap: 2px;
+    color: #0f172a;
+    font-size: 8px;
+    font-weight: 900;
+    pointer-events: none;
+  }
+  .ov3-quadrant strong {
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .ov3-quadrant span {
+    color: #64748b;
+  }
+  .ov3-quadrant.top-left { top: 12px; left: 13px; color: #047857; }
+  .ov3-quadrant.top-right { top: 12px; right: 13px; text-align: right; color: #2563eb; }
+  .ov3-quadrant.bottom-left { bottom: 12px; left: 13px; color: #7c3aed; }
+  .ov3-quadrant.bottom-right { right: 13px; bottom: 12px; text-align: right; color: #dc2626; }
+  .ov3-axis {
+    position: absolute;
+    color: #0f172a;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .ov3-axis.x-axis { right: 16px; bottom: 8px; }
+  .ov3-axis.y-axis { top: 50%; left: 8px; transform: translateY(-50%); writing-mode: vertical-rl; }
+  .ov3-map-point {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+  .ov3-bubble {
+    display: inline-flex;
+    width: 13px;
+    height: 13px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    padding: 0;
+    color: #fff;
+    font-size: 0;
+    box-shadow: 0 12px 20px -14px rgba(15, 23, 42, .9);
+  }
+  .ov3-bubble.assumed { background: #dc2626; }
+  .ov3-bubble.practical { background: #047857; }
+  .ov3-bubble.weak { background: #7c3aed; }
+  .ov3-bubble.stable { background: #2563eb; }
+  .ov3-bubble:hover,
+  .ov3-bubble.is-active {
+    z-index: 4;
+    transform: scale(1.22);
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, .16), 0 12px 20px -14px rgba(15, 23, 42, .9);
+  }
+  .ov3-map-label {
+    position: absolute;
+    z-index: 3;
+    display: inline-flex;
+    max-width: 150px;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 12px;
+    background: rgba(255,255,255,.86);
+    padding: 5px 8px;
+    color: #0f172a;
+    font-size: 10px;
+    font-weight: 950;
+    line-height: 1.15;
+    text-align: left;
+    box-shadow: 0 12px 22px -18px rgba(15,23,42,.75);
+    transform: translate(18px, -50%);
+  }
+  .ov3-map-label::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    width: 18px;
+    height: 1px;
+    background: rgba(100, 116, 139, .45);
+  }
+  .ov3-map-label i {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #2563eb;
+  }
+  .ov3-map-label.assumed i { background: #dc2626; }
+  .ov3-map-label.practical i { background: #047857; }
+  .ov3-map-label.weak i { background: #7c3aed; }
+  .ov3-map-label.stable i { background: #2563eb; }
+  .ov3-map-label span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ov3-map-label.is-active,
+  .ov3-map-label:hover {
+    background: #eff6ff;
+    color: #1d4ed8;
+  }
+  .ov3-map-label.label-1 { transform: translate(22px, -54px); }
+  .ov3-map-label.label-2 { transform: translate(22px, -18px); }
+  .ov3-map-label.label-3 { transform: translate(22px, 18px); }
+  .ov3-map-label.label-4 { transform: translate(22px, 54px); }
+  .ov3-map-label.label-1::before { transform: translateY(34px); }
+  .ov3-map-label.label-2::before { transform: translateY(-2px); }
+  .ov3-map-label.label-3::before { transform: translateY(-38px); }
+  .ov3-map-label.label-4::before { transform: translateY(-74px); }
+  .ov3-map-label.label-left {
+    text-align: right;
+  }
+  .ov3-map-label.label-left::before {
+    right: auto;
+    left: 100%;
+  }
+  .ov3-map-label.label-left.label-1 { transform: translate(calc(-100% - 22px), -54px); }
+  .ov3-map-label.label-left.label-2 { transform: translate(calc(-100% - 22px), -18px); }
+  .ov3-map-label.label-left.label-3 { transform: translate(calc(-100% - 22px), 18px); }
+  .ov3-map-label.label-left.label-4 { transform: translate(calc(-100% - 22px), 54px); }
+  .ov3-recommend-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .ov3-selected-panel {
+    display: none;
+    grid-column: 1 / -1;
+  }
+  .ov3-selected-panel.is-open {
+    display: block;
+  }
+  .ov3-selected-card {
+    display: none;
+  }
+  .ov3-selected-card.is-active {
+    display: grid;
+    grid-template-columns: minmax(150px, .8fr) minmax(220px, 1fr) minmax(180px, .8fr);
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eff6ff, #fff);
+    padding: 10px 12px;
+  }
+  .ov3-recommend-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) minmax(220px, 308px);
+    grid-template-rows: auto auto;
+    gap: 5px 10px;
+    min-height: 74px;
+    overflow: visible;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #fff;
+    padding: 9px 12px;
+  }
+  .ov3-recommend-item > b {
+    grid-row: 1 / 3;
+    display: inline-flex;
+    width: 27px;
+    height: 27px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .ov3-recommend-item:nth-of-type(2) > b { background: #f59e0b; }
+  .ov3-recommend-item:nth-of-type(3) > b { background: #7c3aed; }
+  .ov3-recommend-main h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+    line-height: 1.25;
+  }
+  .ov3-recommend-main h3 span {
+    border-radius: 999px;
+    background: #fee2e2;
+    padding: 2px 7px;
+    color: #dc2626;
+    font-size: 9px;
+  }
+  .ov3-recommend-main p {
+    overflow: visible;
+    display: block;
+    margin-top: 4px;
+    color: #475569;
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ov3-recommend-metrics {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    align-self: center;
+  }
+  .ov3-recommend-metrics span {
+    display: grid;
+    gap: 3px;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 900;
+    text-align: left;
+  }
+  .ov3-recommend-metrics strong {
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .ov3-recommend-metrics span:last-child strong {
+    color: #f97316;
+    font-size: 13px;
+  }
+  .ov3-recommend-actions {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 174px 174px;
+    gap: 9px;
+    margin-top: 8px;
+    border: 1px solid #fed7aa;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #fff7ed, #eff6ff);
+    padding: 8px 10px;
+  }
+  .ov3-recommend-note {
+    display: grid;
+    gap: 3px;
+    align-content: center;
+  }
+  .ov3-recommend-note strong {
+    color: #c2410c;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .ov3-recommend-note span {
+    color: #92400e;
+    font-size: 9px;
+    font-weight: 850;
+  }
+  .ov3-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 12px;
+    padding: 8px 10px;
+    color: #fff !important;
+    font-size: 12px;
+    font-weight: 950;
+  }
+  .ov3-action.green { background: linear-gradient(135deg, #10b981, #059669); }
+  .ov3-action.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .ov3-recommend-card > small {
+    display: block;
+    margin-top: 7px;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 850;
+    text-align: center;
+  }
+  .ov3-detail-card {
+    height: 70px;
+    overflow: hidden;
+  }
+  .ov3-detail-card[open] {
+    height: auto;
+  }
+  .ov3-detail-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 520px);
+    gap: 18px;
+    align-items: center;
+    cursor: pointer;
+    padding: 12px 16px;
+    list-style: none;
+  }
+  .ov3-detail-summary::-webkit-details-marker {
+    display: none;
+  }
+  .ov3-detail-summary h2 {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  .ov3-detail-summary p {
+    margin-top: 4px;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 850;
+  }
+  .ov3-guide {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #eff6ff;
+    padding: 10px 12px;
+  }
+  .ov3-guide strong {
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 950;
+  }
+  .ov3-guide span {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    color: #334155;
+    font-size: 9px;
+    font-weight: 850;
+    white-space: normal;
+  }
+  .ov3-guide i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+  }
+  .ov3-guide .assumed { background: #ef4444; }
+  .ov3-guide .practical { background: #059669; }
+  .ov3-guide b {
+    margin-left: auto;
+    color: #2563eb;
+    font-size: 18px;
+  }
+  .ov3-detail-body {
+    padding: 0 14px 14px;
+  }
+  /* Final desktop layout pass for the overall analysis tab. Keep this block last. */
+  .stats-page {
+    width: 100% !important;
+    max-width: none !important;
+    overflow-x: hidden !important;
+  }
+  [data-stats-panel="overall"].stats-tab-panel.is-active {
+    gap: 10px !important;
+  }
+  [data-stats-panel="overall"] * {
+    min-width: 0;
+  }
+  [data-stats-panel="overall"] .overall-summary-grid {
+    gap: 12px !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card {
+    height: 116px !important;
+    min-height: 116px !important;
+    border-radius: 14px !important;
+    padding: 14px 14px 12px 66px !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card > span {
+    top: 16px !important;
+    left: 16px !important;
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 18px !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card p {
+    margin: 0 !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card strong {
+    margin-top: 7px !important;
+    font-size: 27px !important;
+    line-height: 1 !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card .label-strong {
+    font-size: 20px !important;
+    line-height: 1.18 !important;
+  }
+  [data-stats-panel="overall"] .overall-summary-card em {
+    margin-top: 7px !important;
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+    -webkit-line-clamp: 2 !important;
+  }
+  [data-stats-panel="overall"] .summary-pill,
+  [data-stats-panel="overall"] .summary-link,
+  [data-stats-panel="overall"] .summary-start {
+    margin-top: 7px !important;
+    padding: 5px 11px !important;
+    font-size: 10px !important;
+  }
+  [data-stats-panel="overall"] .summary-sparkline {
+    height: 24px !important;
+    margin-top: 6px !important;
+  }
+  [data-stats-panel="overall"] .overall-main-grid {
+    grid-template-columns: minmax(360px, 39%) minmax(0, 61%) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+    overflow: hidden !important;
+  }
+  [data-stats-panel="overall"] .category-map-card,
+  [data-stats-panel="overall"] .recommend-card {
+    height: 398px !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+  }
+  [data-stats-panel="overall"] .detail-head h2 {
+    font-size: 16px !important;
+    line-height: 1.25 !important;
+  }
+  [data-stats-panel="overall"] .detail-head p,
+  [data-stats-panel="overall"] .recommend-card .detail-head a {
+    margin-top: 4px !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+  }
+  [data-stats-panel="overall"] .category-map {
+    height: 300px !important;
+    margin-top: 12px !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+  }
+  [data-stats-panel="overall"] .map-quadrant {
+    gap: 2px !important;
+    font-size: 9px !important;
+  }
+  [data-stats-panel="overall"] .map-quadrant strong {
+    font-size: 12px !important;
+  }
+  [data-stats-panel="overall"] .map-quadrant.top-left,
+  [data-stats-panel="overall"] .map-quadrant.top-right {
+    top: 12px !important;
+  }
+  [data-stats-panel="overall"] .map-quadrant.bottom-left,
+  [data-stats-panel="overall"] .map-quadrant.bottom-right {
+    bottom: 12px !important;
+  }
+  [data-stats-panel="overall"] .map-axis {
+    font-size: 12px !important;
+  }
+  [data-stats-panel="overall"] .map-bubble {
+    width: auto !important;
+    height: auto !important;
+    max-width: 78px !important;
+    min-width: 12px !important;
+    min-height: 12px !important;
+    border-width: 2px !important;
+    padding: 5px 7px !important;
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    word-break: keep-all !important;
+    box-shadow: 0 12px 20px -14px rgba(15, 23, 42, .9) !important;
+  }
+  [data-stats-panel="overall"] .map-bubble:hover,
+  [data-stats-panel="overall"] .map-bubble.is-active {
+    transform: translate(-50%, -50%) scale(1.08) !important;
+  }
+  [data-stats-panel="overall"] .recommend-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-top: 12px !important;
+  }
+  [data-stats-panel="overall"] .recommend-item {
+    display: grid !important;
+    grid-template-columns: 38px minmax(0, 1fr) minmax(220px, 300px) !important;
+    grid-template-rows: auto auto !important;
+    gap: 6px 12px !important;
+    height: 74px !important;
+    min-height: 74px !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    padding: 10px 14px !important;
+  }
+  [data-stats-panel="overall"] .recommend-item > b {
+    grid-row: 1 / 3 !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+  [data-stats-panel="overall"] .recommend-item h3 span {
+    padding: 2px 7px !important;
+    font-size: 9px !important;
+  }
+  [data-stats-panel="overall"] .recommend-item p {
+    grid-column: 2 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+    -webkit-line-clamp: 2 !important;
+  }
+  [data-stats-panel="overall"] .recommend-metrics {
+    grid-column: 3 !important;
+    grid-row: 1 / 3 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    align-self: center !important;
+  }
+  [data-stats-panel="overall"] .recommend-metrics span {
+    display: grid !important;
+    gap: 3px !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: #64748b !important;
+    font-size: 10px !important;
+    text-align: left !important;
+  }
+  [data-stats-panel="overall"] .recommend-metrics strong {
+    color: #0f172a !important;
+    font-size: 15px !important;
+  }
+  [data-stats-panel="overall"] .recommend-metrics span:last-child strong {
+    color: #f97316 !important;
+    font-size: 13px !important;
+  }
+  [data-stats-panel="overall"] .recommend-actions {
+    grid-template-columns: minmax(220px, 1fr) 180px 180px !important;
+    gap: 10px !important;
+    margin-top: 12px !important;
+    padding: 10px 12px !important;
+    overflow: hidden !important;
+  }
+  [data-stats-panel="overall"] .recommend-note strong {
+    font-size: 11px !important;
+  }
+  [data-stats-panel="overall"] .recommend-note span,
+  [data-stats-panel="overall"] .recommend-card > small {
+    font-size: 9px !important;
+  }
+  [data-stats-panel="overall"] .overall-action {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+  }
+  [data-stats-panel="overall"] .recommend-card > small {
+    margin-top: 7px !important;
+  }
+  [data-stats-panel="overall"] .overall-detail-card {
+    height: 82px !important;
+    min-height: 82px !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+  [data-stats-panel="overall"] .overall-detail-card[open] {
+    height: auto !important;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, .66fr) !important;
+    padding: 14px 16px !important;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary h2 {
+    font-size: 16px !important;
+  }
+  [data-stats-panel="overall"] .overall-detail-summary p {
+    font-size: 10px !important;
+  }
+  [data-stats-panel="overall"] .judgement-guide {
+    grid-template-columns: auto auto auto 18px !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+  }
+  [data-stats-panel="overall"] .judgement-guide strong {
+    font-size: 11px !important;
+  }
+  [data-stats-panel="overall"] .judgement-guide span {
+    font-size: 9px !important;
+  }
+  @media (max-width: 900px) {
+    .overall-card {
+      grid-template-columns: 1fr 1fr;
+    }
+    .middle-grid,
+    .breakdown-list {
+      grid-template-columns: 1fr;
+    }
+    .practice-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .practice-middle-grid {
+      grid-template-columns: 1fr;
+    }
+    .overall-summary-grid,
+    .overall-main-grid,
+    .recommend-actions {
+      grid-template-columns: 1fr;
+    }
+    .practice-analysis-head,
+    .practice-analysis-row {
+      grid-template-columns: 44px 72px minmax(220px, 1fr) 120px 120px 110px 90px 90px;
+    }
+    .recommend-item,
+    .overall-analysis-head,
+    .overall-analysis-row {
+      grid-template-columns: 1fr;
+    }
+    .mini-rank-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('[data-stats-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.statsTab;
+      document.querySelectorAll('[data-stats-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.statsTab === target);
+      });
+      document.querySelectorAll('[data-stats-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.statsPanel === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-trend-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.trendTab;
+      document.querySelectorAll('[data-trend-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.trendTab === target);
+      });
+      document.querySelectorAll('[data-trend-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.trendPanel === target);
+      });
+      document.querySelectorAll('[data-trend-stats]').forEach((stats) => {
+        stats.classList.toggle('is-active', stats.dataset.trendStats === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-analysis-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.analysisTab;
+      document.querySelectorAll('[data-analysis-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.analysisTab === target);
+      });
+      document.querySelectorAll('[data-analysis-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.analysisPanel === target);
+      });
+    });
+  });
+
+  const categorySort = document.querySelector('[data-category-sort]');
+  const categoryTable = document.querySelector('.category-term-table');
+  if (categorySort && categoryTable) {
+    categorySort.addEventListener('change', () => {
+      const rows = Array.from(categoryTable.querySelectorAll('[data-category-row]'));
+      const sorted = rows.sort((a, b) => {
+        const rateA = Number(a.dataset.rate || 0);
+        const rateB = Number(b.dataset.rate || 0);
+        const unknownA = Number(a.dataset.unknown || 0);
+        const unknownB = Number(b.dataset.unknown || 0);
+        const untrainedA = Number(a.dataset.untrained || 0);
+        const untrainedB = Number(b.dataset.untrained || 0);
+        const nameA = a.dataset.name || '';
+        const nameB = b.dataset.name || '';
+        if (categorySort.value === 'high') return rateB - rateA || nameA.localeCompare(nameB, 'ja');
+        if (categorySort.value === 'unknown') return unknownB - unknownA || rateA - rateB || nameA.localeCompare(nameB, 'ja');
+        if (categorySort.value === 'untrained') return untrainedB - untrainedA || rateA - rateB || nameA.localeCompare(nameB, 'ja');
+        if (categorySort.value === 'name') return nameA.localeCompare(nameB, 'ja');
+        return rateA - rateB || nameA.localeCompare(nameB, 'ja');
+      });
+      sorted.forEach((row) => categoryTable.appendChild(row));
+    });
+  }
+
+  const showReviewMore = document.querySelector('[data-show-review-more]');
+  if (showReviewMore) {
+    showReviewMore.addEventListener('click', () => {
+      document.querySelectorAll('[data-extra-review]').forEach((row) => {
+        row.hidden = false;
+      });
+      showReviewMore.hidden = true;
+    });
+  }
+
+  document.querySelectorAll('[data-practice-category-sort]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const mode = select.dataset.practiceCategorySort;
+      const table = document.querySelector(`[data-practice-category-table="${mode}"]`);
+      if (!table) return;
+      const rows = Array.from(table.querySelectorAll('[data-practice-category-row]'));
+      rows.sort((a, b) => {
+        const accuracyA = Number(a.dataset.accuracy || 0);
+        const accuracyB = Number(b.dataset.accuracy || 0);
+        const totalA = Number(a.dataset.total || 0);
+        const totalB = Number(b.dataset.total || 0);
+        const nameA = a.dataset.name || '';
+        const nameB = b.dataset.name || '';
+        if (select.value === 'high') return accuracyB - accuracyA || nameA.localeCompare(nameB, 'ja');
+        if (select.value === 'total') return totalB - totalA || accuracyA - accuracyB || nameA.localeCompare(nameB, 'ja');
+        if (select.value === 'name') return nameA.localeCompare(nameB, 'ja');
+        return accuracyA - accuracyB || nameA.localeCompare(nameB, 'ja');
+      });
+      rows.forEach((row) => table.appendChild(row));
+    });
+  });
+
+  document.querySelectorAll('[data-practice-trend-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.practiceTrendTab;
+      const panelRoot = button.closest('[data-practice-mode-panel]') || document;
+      panelRoot.querySelectorAll('[data-practice-trend-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.practiceTrendTab === target);
+      });
+      panelRoot.querySelectorAll('[data-practice-trend-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.practiceTrendPanel === target);
+      });
+      panelRoot.querySelectorAll('[data-practice-trend-stats]').forEach((stats) => {
+        stats.classList.toggle('is-active', stats.dataset.practiceTrendStats === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-practice-analysis-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.practiceAnalysisTab;
+      const panelRoot = button.closest('[data-practice-mode-panel]') || document;
+      panelRoot.querySelectorAll('[data-practice-analysis-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.practiceAnalysisTab === target);
+      });
+      panelRoot.querySelectorAll('[data-practice-analysis-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.practiceAnalysisPanel === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-practice-mode-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.practiceModeTab;
+      document.querySelectorAll('[data-practice-mode-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.practiceModeTab === target);
+      });
+      document.querySelectorAll('[data-practice-mode-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.practiceModePanel === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-overall-analysis-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.overallAnalysisTab;
+      document.querySelectorAll('[data-overall-analysis-tab]').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.overallAnalysisTab === target);
+      });
+      document.querySelectorAll('[data-overall-analysis-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.overallAnalysisPanel === target);
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-map-category]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const category = button.dataset.mapCategory;
+      document.querySelectorAll('[data-map-category]').forEach((bubble) => {
+        bubble.classList.toggle('is-active', bubble.dataset.mapCategory === category);
+      });
+      const matchingCard = document.querySelector(`[data-recommend-category="${CSS.escape(category)}"]`);
+      document.querySelectorAll('[data-recommend-category]').forEach((card) => {
+        card.classList.toggle('is-active', card.dataset.recommendCategory === category);
+      });
+      document.querySelectorAll('[data-map-detail]').forEach((card) => {
+        card.classList.toggle('is-active', card.dataset.mapDetail === category);
+      });
+      document.querySelectorAll('.map-selected-panel, .ov3-selected-panel').forEach((panel) => {
+        panel.classList.toggle('is-open', !matchingCard);
+      });
+      if (matchingCard) {
+        matchingCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  });
+
+  document.querySelectorAll('.ov3-map').forEach((map) => {
+    const points = Array.from(map.querySelectorAll('.ov3-map-point'));
+    const occupiedPoints = [];
+    const pointOffsets = [
+      [0, 0], [24, 0], [-24, 0], [0, -24], [0, 24],
+      [24, -24], [-24, -24], [24, 24], [-24, 24],
+      [42, 0], [-42, 0], [0, -42], [0, 42],
+    ];
+    points.forEach((point) => {
+      const bubble = point.querySelector('.ov3-bubble');
+      if (!bubble) return;
+      for (const [x, y] of pointOffsets) {
+        point.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+        const rect = bubble.getBoundingClientRect();
+        const overlaps = occupiedPoints.some((prev) => !(
+          rect.right + 6 < prev.left ||
+          rect.left - 6 > prev.right ||
+          rect.bottom + 6 < prev.top ||
+          rect.top - 6 > prev.bottom
+        ));
+        if (!overlaps) {
+          occupiedPoints.push(rect);
+          break;
+        }
+      }
+    });
+
+    const labels = Array.from(map.querySelectorAll('.ov3-map-point span'));
+    const placed = [];
+    labels.forEach((label, index) => {
+      label.style.marginTop = '';
+      let guard = 0;
+      let rect = label.getBoundingClientRect();
+      while (placed.some((prev) => !(rect.right < prev.left || rect.left > prev.right || rect.bottom < prev.top || rect.top > prev.bottom)) && guard < 8) {
+        const direction = index % 2 === 0 ? 1 : -1;
+        label.style.marginTop = `${direction * (guard + 1) * 8}px`;
+        rect = label.getBoundingClientRect();
+        guard += 1;
+      }
+      placed.push(rect);
+    });
+  });
+
+  document.querySelectorAll('[data-show-more]').forEach((button) => {
+    const panel = button.closest('[data-overall-analysis-panel]');
+    if (!panel || !panel.querySelector('[data-extra-analysis]')) {
+      button.hidden = true;
+      return;
+    }
+    button.addEventListener('click', () => {
+      if (!panel) return;
+      const expanded = panel.classList.toggle('is-expanded');
+      button.textContent = expanded ? '折りたたむ' : 'もっと見る';
+    });
+  });
+</script>
+{% endblock %}

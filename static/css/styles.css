@@ -1,0 +1,426 @@
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+
+@media (min-width: 1024px) {
+  .app-viewport {
+    width: 100%;
+    min-height: 100vh;
+  }
+}
+
+@media (min-width: 1280px) {
+  .home-dashboard,
+  .history-dashboard,
+  .statistics-dashboard {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .home-action-grid {
+    grid-template-columns: minmax(0, 1.55fr) minmax(19rem, .75fr) !important;
+  }
+
+  .home-recommend-section > .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(18rem, .75fr) !important;
+  }
+
+  .history-dashboard > .grid {
+    grid-template-columns: minmax(22rem, 28rem) minmax(0, 1fr) !important;
+  }
+
+  .statistics-dashboard > .grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(27rem, .8fr) !important;
+  }
+
+  .statistics-dashboard > .grid:last-of-type {
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, .7fr) !important;
+  }
+}
+
+@media (min-width: 1536px) {
+  .home-dashboard {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .home-dashboard > section:first-child,
+  .home-dashboard > section:nth-child(2),
+  .home-dashboard > .advice {
+    grid-column: auto;
+  }
+
+  .home-dashboard > .home-action-grid {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1.85fr) minmax(280px, .9fr) !important;
+    margin-top: 1rem !important;
+  }
+
+  .home-dashboard > .home-recommend-section {
+    grid-column: auto;
+    grid-row: auto;
+    margin-top: 1rem !important;
+  }
+
+  .home-recommend-section > .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, .72fr) !important;
+  }
+
+  .home-recommend-section .recommend-body {
+    grid-template-columns: 92px 1fr !important;
+  }
+
+  .home-recommend-section .quick-card {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .history-dashboard {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .history-dashboard > .grid {
+    grid-template-columns: minmax(24rem, 30rem) minmax(0, 1fr) !important;
+  }
+
+  .history-dashboard svg.h-72 {
+    height: 15rem !important;
+  }
+
+  .history-table {
+    grid-template-columns: 8rem minmax(28rem, 1.8fr) 8rem minmax(20rem, 1fr) !important;
+  }
+
+  .statistics-dashboard {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .statistics-dashboard > section.panel:first-of-type > .grid {
+    grid-template-columns: 11rem minmax(0, 1fr) minmax(22rem, .7fr) !important;
+  }
+
+  .statistics-dashboard > .grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(24rem, .75fr) !important;
+  }
+
+  .statistics-dashboard > .grid:last-of-type {
+    grid-template-columns: minmax(0, 1.1fr) minmax(24rem, .75fr) !important;
+  }
+
+  .category-row {
+    grid-template-columns: 2.3rem minmax(0, 1fr) 1.25rem !important;
+    padding: .65rem .8rem !important;
+  }
+
+  .weak-term-row,
+  .weak-term-head {
+    grid-template-columns: 3rem minmax(14rem, 1fr) minmax(13rem, .8fr) 4.5rem !important;
+  }
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input[type="submit"] {
+  font-weight: 600;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+
+  main {
+    padding: .9rem 1rem !important;
+  }
+
+  header {
+    padding: .75rem 1.25rem !important;
+  }
+
+  aside {
+    width: 15rem !important;
+    padding: 1rem .75rem !important;
+  }
+
+  aside nav {
+    gap: .25rem !important;
+  }
+
+  aside a {
+    border-radius: .9rem !important;
+    padding: .55rem .75rem !important;
+  }
+
+  aside a span {
+    width: 2rem !important;
+    height: 2rem !important;
+    border-radius: .75rem !important;
+  }
+
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl {
+    max-width: none !important;
+  }
+
+  .panel,
+  .rounded-2xl.border,
+  .rounded-\[32px\] {
+    border-radius: .9rem !important;
+    padding: 1rem !important;
+  }
+
+  .shadow-sm {
+    box-shadow: 0 1px 1px rgba(15, 23, 42, .04) !important;
+  }
+
+  .text-4xl {
+    font-size: 1.75rem !important;
+    line-height: 2.1rem !important;
+  }
+
+  .text-3xl {
+    font-size: 1.45rem !important;
+    line-height: 1.85rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.2rem !important;
+    line-height: 1.55rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.05rem !important;
+    line-height: 1.45rem !important;
+  }
+
+  .p-8,
+  .md\:p-8,
+  .p-7,
+  .md\:p-7 {
+    padding: 1.15rem !important;
+  }
+
+  .p-6,
+  .md\:p-6 {
+    padding: 1rem !important;
+  }
+
+  .p-5 {
+    padding: .85rem !important;
+  }
+
+  .px-8,
+  .lg\:px-8 {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  .py-8,
+  .py-7,
+  .py-6 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .px-6,
+  .px-5 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .py-4,
+  .py-3 {
+    padding-top: .65rem !important;
+    padding-bottom: .65rem !important;
+  }
+
+  .mt-8,
+  .mt-7,
+  .mt-6 {
+    margin-top: 1rem !important;
+  }
+
+  .mt-5,
+  .mt-4 {
+    margin-top: .75rem !important;
+  }
+
+  .mb-10,
+  .mb-8,
+  .mb-7,
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+
+  .gap-8,
+  .gap-7,
+  .gap-6,
+  .gap-5 {
+    gap: 1rem !important;
+  }
+
+  .space-y-6 > :not([hidden]) ~ :not([hidden]),
+  .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: .75rem !important;
+  }
+
+  .h-20,
+  .w-20 {
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+  }
+
+  .h-16,
+  .w-16 {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  .h-14,
+  .w-14 {
+    height: 2.75rem !important;
+    width: 2.75rem !important;
+  }
+
+  .h-12,
+  .w-12,
+  .h-10,
+  .w-10 {
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+  }
+
+  .text-4xl,
+  .text-3xl {
+    letter-spacing: 0 !important;
+  }
+
+  .panel-head h2 {
+    font-size: 1.15rem !important;
+    line-height: 1.45rem !important;
+  }
+
+  .summary-card,
+  .today-card {
+    padding: .8rem 1rem !important;
+  }
+
+  .summary-icon,
+  .today-icon {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    font-size: 1.25rem !important;
+  }
+
+  .summary-card strong,
+  .today-card strong,
+  .overall-card strong {
+    font-size: 1.7rem !important;
+  }
+
+  .practice-mode-card,
+  .flashcard-mode-card,
+  .setting-card,
+  .exam-type-card {
+    min-height: auto !important;
+    border-radius: .9rem !important;
+    padding: 1rem !important;
+  }
+
+  .practice-mode-card > span,
+  .flashcard-mode-card > span {
+    margin-top: .75rem !important;
+  }
+
+  .calendar-cell {
+    height: 1.85rem !important;
+    min-width: 1.85rem !important;
+    border-radius: .4rem !important;
+    font-size: .78rem !important;
+  }
+
+  .history-table-row,
+  .history-table-head {
+    min-height: auto !important;
+    padding: .65rem 1rem !important;
+  }
+
+  .history-icon {
+    width: 2rem !important;
+    height: 2rem !important;
+    font-size: 1rem !important;
+  }
+
+  .donut {
+    width: 9rem !important;
+    height: 9rem !important;
+  }
+
+  .donut::after {
+    inset: 1.8rem !important;
+  }
+
+  .overall-card,
+  .point-card,
+  .recommend-card,
+  .quick-card,
+  .priority-box,
+  .resume-card {
+    border-radius: .85rem !important;
+    padding: .9rem !important;
+  }
+
+  .review-main-icon {
+    width: 3.75rem !important;
+    height: 3.75rem !important;
+    font-size: 1.75rem !important;
+  }
+
+  .recommend-body {
+    margin: .9rem 0 .75rem !important;
+  }
+
+  .mini-chart {
+    height: 4rem !important;
+  }
+
+  .quick-link {
+    margin-top: .6rem !important;
+    padding: .75rem !important;
+  }
+
+  .quick-link span {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    font-size: 1.1rem !important;
+  }
+
+  .result-stat,
+  .answer-option,
+  .choice-card,
+  .detail-card {
+    padding: .85rem !important;
+  }
+
+  .history-chart-svg {
+    height: 186px !important;
+  }
+}
