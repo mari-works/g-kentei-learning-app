@@ -131,7 +131,7 @@
           <div class="recommend-head">
             <span>▣</span>
             <strong>用語学習のおすすめ</strong>
-            <em>今日の提案</em>
+            <em>{{ '本日実施済み' if term_recommendation.completed_today else '今日の提案' }}</em>
           </div>
           <h3>「{{ term_recommendation.keyword }}」を復習しましょう</h3>
           <p>{{ term_recommendation.reason }}</p>
@@ -143,7 +143,10 @@
               <i style="height: 46%;"></i><i style="height: 62%;"></i><i style="height: 54%;"></i><i style="height: 49%;"></i><i style="height: 38%;"></i>
             </div>
           </div>
-          <a href="{{ term_recommendation.url }}" class="primary-green">用語学習を始める <span>›</span></a>
+          {% if term_recommendation.completed_today %}
+            <p class="recommend-completed">今日はこのおすすめを一度学習済みです。</p>
+          {% endif %}
+          <a href="{{ term_recommendation.url }}" class="primary-green">{{ term_recommendation.button_label }} <span>›</span></a>
         </article>
 
         <article class="recommend-card blue">
@@ -597,12 +600,25 @@
     background: #dcfce7;
     color: #059669;
   }
+  .recommend-card.green .recommend-head em.is-done,
+  .recommend-completed {
+    background: #ecfdf5;
+    color: #047857;
+  }
   .recommend-card p {
     margin-top: 8px;
     color: #475569;
     font-size: 13px;
     font-weight: 800;
     line-height: 1.7;
+  }
+  .recommend-card .recommend-completed {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1.2;
   }
   .recommend-body {
     display: grid;

@@ -7,7 +7,8 @@
   <nav class="stats-tabs" aria-label="統計情報タブ">
     <button type="button" class="stats-tab is-active" data-stats-tab="terms">用語理解度</button>
     <button type="button" class="stats-tab" data-stats-tab="practice">問題演習</button>
-    <button type="button" class="stats-tab" data-stats-tab="overall">総合分析</button>
+    {# 総合分析は一時非表示。復活時は hidden を外すだけで再表示できます。 #}
+    <button type="button" class="stats-tab" data-stats-tab="overall" hidden>総合分析</button>
   </nav>
 
   <section class="stats-tab-panel is-active" data-stats-panel="terms">
@@ -132,7 +133,7 @@
       </div>
       <div class="analysis-chip-row" role="tablist" aria-label="詳細分析">
         {% for key, label in [
-          ('weak-terms','苦手用語TOP10'),
+          ('weak-terms','苦手用語ランキング'),
           ('category-understanding','カテゴリ別理解度'),
           ('review-terms','要復習用語'),
           ('growth-terms','成長した用語'),
@@ -146,22 +147,35 @@
         {% if not term_detail_analysis.has_history %}
           <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
         {% elif term_detail_analysis.weak_terms %}
+          <div class="analysis-toolbar">
+            <label>カテゴリ
+              <select data-detail-category-filter>
+                <option value="all">すべて</option>
+                {% for category_item in term_detail_analysis.category_understanding %}
+                  <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
           <div class="term-analysis-table weak-term-table">
-            <div class="term-analysis-head"><span>順位</span><span>用語名</span><span>カテゴリ</span><span>現在</span><span>未理解</span><span>あいまい</span><span>スコア</span><span>最終学習日</span><span></span></div>
+            <div class="term-analysis-head"><span>順位</span><span>用語名</span><span>カテゴリ</span><span>現在</span><span>未理解</span><span>あいまい</span><span>最終学習日</span><span></span></div>
             {% for item in term_detail_analysis.weak_terms %}
-              <div class="term-analysis-row">
+              <div class="term-analysis-row" data-detail-category="{{ item.category }}" {% if loop.index > 10 %}data-extra-weak hidden{% endif %}>
                 <b class="{% if loop.index <= 3 %}rank-top{% endif %}">{{ loop.index }}</b>
                 <strong>{{ item.keyword }}</strong>
                 <span>{{ item.category }}</span>
                 <mark class="status-{{ item.status_tone }}">{{ item.status_label }}</mark>
                 <em>{{ item.unknown_count }}</em>
                 <em>{{ item.ambiguous_count }}</em>
-                <em>{{ item.weak_score }}</em>
                 <span>{{ item.last_reviewed_label }}</span>
                 <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">この用語を復習</a>
               </div>
             {% endfor %}
           </div>
+          {% if term_detail_analysis.weak_terms|length > 10 %}
+            <button type="button" class="show-more-analysis" data-show-weak-more>もっと見る</button>
+          {% endif %}
+          <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
         {% else %}
           <div class="empty-analysis">苦手用語はまだありません。</div>
         {% endif %}
@@ -201,10 +215,20 @@
         {% if not term_detail_analysis.has_history %}
           <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
         {% elif term_detail_analysis.review_terms %}
+          <div class="analysis-toolbar">
+            <label>カテゴリ
+              <select data-detail-category-filter>
+                <option value="all">すべて</option>
+                {% for category_item in term_detail_analysis.category_understanding %}
+                  <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
           <div class="term-analysis-table review-term-table" data-review-list>
-            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>現在</span><span>最終学習日</span><span>経過</span><span>未理解</span><span>あいまい</span><span>スコア</span><span>優先度</span><span></span></div>
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>現在</span><span>最終学習日</span><span>経過</span><span>未理解</span><span>あいまい</span><span>優先度</span><span></span></div>
             {% for item in term_detail_analysis.review_terms %}
-              <div class="term-analysis-row" {% if loop.index > 10 %}data-extra-review hidden{% endif %}>
+              <div class="term-analysis-row" data-detail-category="{{ item.category }}" {% if loop.index > 10 %}data-extra-review hidden{% endif %}>
                 <strong>{{ item.keyword }}</strong>
                 <span>{{ item.category }}</span>
                 <mark class="status-{{ item.status_tone }}">{{ item.status_label }}</mark>
@@ -212,12 +236,12 @@
                 <em>{{ item.days_since }}日</em>
                 <em>{{ item.unknown_count }}</em>
                 <em>{{ item.ambiguous_count }}</em>
-                <em>{{ item.review_score }}</em>
                 <mark class="status-{{ item.priority_tone }}">{{ item.priority_label }}</mark>
                 <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">復習</a>
               </div>
             {% endfor %}
           </div>
+          <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
           {% if term_detail_analysis.review_terms|length > 10 %}
             <button type="button" class="show-more-analysis" data-show-review-more>さらに表示</button>
           {% endif %}
@@ -230,20 +254,30 @@
         {% if not term_detail_analysis.has_history %}
           <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
         {% elif term_detail_analysis.growth_terms %}
+          <div class="analysis-toolbar">
+            <label>カテゴリ
+              <select data-detail-category-filter>
+                <option value="all">すべて</option>
+                {% for category_item in term_detail_analysis.category_understanding %}
+                  <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
           <div class="term-analysis-table growth-term-table">
-            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>過去の未理解</span><span>過去のあいまい</span><span>理解済みになった日</span><span>スコア</span><span>変化</span></div>
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>過去の未理解</span><span>過去のあいまい</span><span>理解済みになった日</span><span>変化</span></div>
             {% for item in term_detail_analysis.growth_terms %}
-              <div class="term-analysis-row">
+              <div class="term-analysis-row" data-detail-category="{{ item.category }}">
                 <strong>{{ item.keyword }}</strong>
                 <span>{{ item.category }}</span>
                 <em>{{ item.past_unknown_count }}</em>
                 <em>{{ item.past_ambiguous_count }}</em>
                 <span>{{ item.understood_label }}</span>
-                <em>{{ item.growth_score }}</em>
                 <mark class="status-green">{{ item.change_label }}</mark>
               </div>
             {% endfor %}
           </div>
+          <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
         {% else %}
           <div class="empty-analysis">理解度の変化が記録されると、成長した用語が表示されます。</div>
         {% endif %}
@@ -253,22 +287,32 @@
         {% if not term_detail_analysis.has_history %}
           <div class="empty-analysis">用語を学習すると、詳細分析が表示されます。</div>
         {% elif term_detail_analysis.forgetting_terms %}
+          <div class="analysis-toolbar">
+            <label>カテゴリ
+              <select data-detail-category-filter>
+                <option value="all">すべて</option>
+                {% for category_item in term_detail_analysis.category_understanding %}
+                  <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
           <div class="term-analysis-table forgetting-term-table">
-            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>最終学習日</span><span>経過</span><span>過去の未理解</span><span>過去のあいまい</span><span>リスク</span><span>状態</span><span></span></div>
+            <div class="term-analysis-head"><span>用語名</span><span>カテゴリ</span><span>最終学習日</span><span>経過</span><span>過去の未理解</span><span>過去のあいまい</span><span>状態</span><span></span></div>
             {% for item in term_detail_analysis.forgetting_terms %}
-              <div class="term-analysis-row">
+              <div class="term-analysis-row" data-detail-category="{{ item.category }}">
                 <strong>{{ item.keyword }}</strong>
                 <span>{{ item.category }}</span>
                 <span>{{ item.last_reviewed_label }}</span>
                 <em>{{ item.days_since }}日</em>
                 <em>{{ item.unknown_count }}</em>
                 <em>{{ item.ambiguous_count }}</em>
-                <em>{{ item.forgetting_score }}</em>
                 <mark class="status-{{ item.risk_tone }}">{{ item.risk_label }}</mark>
                 <a href="{{ url_for('flashcards', keyword_id=item.id, limit=10, direction='term_to_meaning') }}">復習</a>
               </div>
             {% endfor %}
           </div>
+          <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
         {% else %}
           <div class="empty-analysis">長期間復習していない理解済み用語はありません。</div>
         {% endif %}
@@ -424,10 +468,20 @@
 
           <div class="practice-analysis-content is-active" data-practice-analysis-panel="{{ mode_key }}-practice-weak">
             {% if mode_data.detail_analysis.weak_questions_top10 %}
+              <div class="analysis-toolbar">
+                <label>カテゴリ
+                  <select data-detail-category-filter>
+                    <option value="all">すべて</option>
+                    {% for category_item in mode_data.detail_analysis.category_accuracy %}
+                      <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
               <div class="practice-detail-table practice-weak-table">
                 <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>問題文</span><span>カテゴリ</span><span>正答率</span><span>正解数/回答回数</span><span>最終回答日</span><span></span></div>
                 {% for item in mode_data.detail_analysis.weak_questions_top10 %}
-                  <div class="practice-detail-row">
+                  <div class="practice-detail-row" data-detail-category="{{ item.category }}">
                     <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
                     <strong>Q-{{ item.id }}</strong>
                     <span class="question-snippet" title="{{ item.question }}">{{ item.question }}</span>
@@ -439,6 +493,7 @@
                   </div>
                 {% endfor %}
               </div>
+              <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
             {% else %}
               <div class="empty-analysis">まだ分析できるデータがありません。</div>
             {% endif %}
@@ -476,10 +531,20 @@
 
           <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-priority">
             {% if mode_data.detail_analysis.review_priority %}
+              <div class="analysis-toolbar">
+                <label>カテゴリ
+                  <select data-detail-category-filter>
+                    <option value="all">すべて</option>
+                    {% for category_item in mode_data.detail_analysis.category_accuracy %}
+                      <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
               <div class="practice-detail-table practice-priority-table">
                 <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>不正解回数</span><span>正答率</span><span>最終不正解日</span><span></span></div>
                 {% for item in mode_data.detail_analysis.review_priority %}
-                  <div class="practice-detail-row">
+                  <div class="practice-detail-row" data-detail-category="{{ item.category }}">
                     <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
                     <strong>Q-{{ item.id }}</strong>
                     <em class="category-badge">{{ item.category }}</em>
@@ -490,6 +555,7 @@
                   </div>
                 {% endfor %}
               </div>
+              <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
             {% else %}
               <div class="empty-analysis">まだ分析できるデータがありません。</div>
             {% endif %}
@@ -497,10 +563,20 @@
 
           <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-growth">
             {% if mode_data.detail_analysis.improved_questions %}
+              <div class="analysis-toolbar">
+                <label>カテゴリ
+                  <select data-detail-category-filter>
+                    <option value="all">すべて</option>
+                    {% for category_item in mode_data.detail_analysis.category_accuracy %}
+                      <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
               <div class="practice-detail-table practice-growth-table">
                 <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>過去の不正解回数</span><span>最後に正解した日</span><span>変化</span></div>
                 {% for item in mode_data.detail_analysis.improved_questions %}
-                  <div class="practice-detail-row">
+                  <div class="practice-detail-row" data-detail-category="{{ item.category }}">
                     <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
                     <strong>Q-{{ item.id }}</strong>
                     <em class="category-badge">{{ item.category }}</em>
@@ -510,6 +586,7 @@
                   </div>
                 {% endfor %}
               </div>
+              <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
             {% else %}
               <div class="empty-analysis">まだ分析できるデータがありません。</div>
             {% endif %}
@@ -517,10 +594,20 @@
 
           <div class="practice-analysis-content" data-practice-analysis-panel="{{ mode_key }}-practice-never-correct">
             {% if mode_data.detail_analysis.never_correct %}
+              <div class="analysis-toolbar">
+                <label>カテゴリ
+                  <select data-detail-category-filter>
+                    <option value="all">すべて</option>
+                    {% for category_item in mode_data.detail_analysis.category_accuracy %}
+                      <option value="{{ category_item.name }}">{{ category_item.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
               <div class="practice-detail-table practice-never-table">
                 <div class="practice-detail-head"><span>順位</span><span>問題ID</span><span>カテゴリ</span><span>回答回数</span><span>最終回答日</span><span></span></div>
                 {% for item in mode_data.detail_analysis.never_correct %}
-                  <div class="practice-detail-row">
+                  <div class="practice-detail-row" data-detail-category="{{ item.category }}">
                     <b class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</b>
                     <strong>Q-{{ item.id }}</strong>
                     <em class="category-badge">{{ item.category }}</em>
@@ -530,6 +617,7 @@
                   </div>
                 {% endfor %}
               </div>
+              <div class="empty-analysis" data-category-empty hidden>選択したカテゴリのデータはありません。</div>
             {% else %}
               <div class="empty-analysis">まだ分析できるデータがありません。</div>
             {% endif %}
@@ -539,7 +627,8 @@
     {% endfor %}
   </section>
 
-  <section class="stats-tab-panel overall-v3" data-stats-panel="overall">
+  {# 総合分析は一時非表示。内容は保持しています。 #}
+  <section class="stats-tab-panel overall-v3" data-stats-panel="overall" hidden>
     <section class="ov3-summary-grid">
       <article class="ov3-summary-card blue">
         <span>◎</span>
@@ -752,7 +841,7 @@
       <div class="overall-analysis-content" data-overall-analysis-panel="overall-growth">
         <div class="mini-rank-grid">
           {% for item in overall_growth_categories %}
-            <div class="mini-rank-card green" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.answer_rate }}%;"></em></i><span>総合スコア {{ item.answer_rate }}% / 理解度 {{ item.term_rate }}%</span></div>
+            <div class="mini-rank-card green" {% if loop.index > 5 %}data-extra-analysis{% endif %}><b>{{ loop.index }}</b><strong>{{ item.name }}</strong><i><em style="width: {{ item.answer_rate }}%;"></em></i><span>正答率 {{ item.answer_rate }}% / 理解度 {{ item.term_rate }}%</span></div>
           {% endfor %}
         </div>
         <button type="button" class="show-more-analysis" data-show-more>もっと見る</button>
@@ -1330,8 +1419,8 @@
   }
   .weak-term-table .term-analysis-head,
   .weak-term-table .term-analysis-row {
-    grid-template-columns: 46px minmax(170px, 1.2fr) minmax(120px, .8fr) 86px 64px 64px 64px 100px 116px;
-    min-width: 980px;
+    grid-template-columns: 46px minmax(190px, 1.3fr) minmax(130px, .8fr) 86px 64px 64px 110px 116px;
+    min-width: 900px;
   }
   .category-term-table .term-analysis-head,
   .category-term-table .term-analysis-row {
@@ -1340,45 +1429,69 @@
   }
   .review-term-table .term-analysis-head,
   .review-term-table .term-analysis-row {
-    grid-template-columns: minmax(160px, 1.1fr) minmax(120px, .7fr) 78px 96px 62px 62px 62px 62px 90px 68px;
-    min-width: 1040px;
+    grid-template-columns: minmax(180px, 1.2fr) minmax(130px, .8fr) 78px 96px 62px 62px 62px 90px 68px;
+    min-width: 960px;
   }
   .growth-term-table .term-analysis-head,
   .growth-term-table .term-analysis-row {
-    grid-template-columns: minmax(180px, 1.3fr) minmax(130px, .8fr) 90px 90px 130px 72px 130px;
-    min-width: 860px;
+    grid-template-columns: minmax(200px, 1.4fr) minmax(140px, .9fr) 100px 100px 140px 140px;
+    min-width: 780px;
   }
   .forgetting-term-table .term-analysis-head,
   .forgetting-term-table .term-analysis-row {
-    grid-template-columns: minmax(180px, 1.3fr) minmax(130px, .8fr) 100px 62px 92px 92px 72px 106px 68px;
-    min-width: 980px;
+    grid-template-columns: minmax(200px, 1.4fr) minmax(140px, .85fr) 106px 62px 98px 98px 116px 68px;
+    min-width: 890px;
   }
   .term-analysis-head {
     background: #f8fafc;
     color: #64748b;
     font-size: 11px;
     font-weight: 950;
+    text-align: center;
   }
   .term-analysis-row {
     border-top: 1px solid #e2e8f0;
     color: #334155;
     font-size: 12px;
     font-weight: 850;
+    text-align: center;
   }
   .term-analysis-row strong {
     color: #0f172a;
     font-size: 12px;
     font-weight: 950;
     line-height: 1.45;
+    text-align: left;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+  .term-analysis-row > span {
+    text-align: center;
+  }
+  .term-analysis-row > span:nth-child(2),
+  .term-analysis-row > span:nth-child(3) {
+    text-align: left;
+  }
+  .category-term-table .term-analysis-row > strong,
+  .category-term-table .term-analysis-head > span:first-child {
+    text-align: left;
+  }
+  .weak-term-table .term-analysis-head > span:nth-child(2),
+  .weak-term-table .term-analysis-head > span:nth-child(3),
+  .review-term-table .term-analysis-head > span:nth-child(1),
+  .review-term-table .term-analysis-head > span:nth-child(2),
+  .growth-term-table .term-analysis-head > span:nth-child(1),
+  .growth-term-table .term-analysis-head > span:nth-child(2),
+  .forgetting-term-table .term-analysis-head > span:nth-child(1),
+  .forgetting-term-table .term-analysis-head > span:nth-child(2) {
+    text-align: left;
   }
   .term-analysis-row em {
     color: #0f172a;
     font-size: 12px;
     font-style: normal;
     font-weight: 950;
-    text-align: right;
+    text-align: center;
   }
   .term-analysis-row > b {
     display: inline-flex;
@@ -1666,12 +1779,14 @@
     color: #64748b;
     font-size: 11px;
     font-weight: 950;
+    text-align: center;
   }
   .practice-detail-row {
     border-top: 1px solid #e2e8f0;
     color: #334155;
     font-size: 12px;
     font-weight: 850;
+    text-align: center;
   }
   .practice-detail-row strong,
   .practice-detail-row p {
@@ -1680,8 +1795,17 @@
     font-size: 12px;
     font-weight: 950;
   }
+  .practice-detail-row strong {
+    text-align: left;
+  }
+  .practice-detail-head > span:first-child,
+  .practice-priority-table .practice-detail-head > span:nth-child(3),
+  .practice-growth-table .practice-detail-head > span:nth-child(3),
+  .practice-never-table .practice-detail-head > span:nth-child(3) {
+    text-align: left;
+  }
   .practice-detail-row p {
-    text-align: right;
+    text-align: center;
   }
   .question-snippet {
     display: -webkit-box;
@@ -1689,6 +1813,7 @@
     color: #0f172a;
     font-size: 12px;
     font-weight: 850;
+    text-align: left;
     line-height: 1.45;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -3827,6 +3952,52 @@
       showReviewMore.hidden = true;
     });
   }
+
+  const showWeakMore = document.querySelector('[data-show-weak-more]');
+  if (showWeakMore) {
+    showWeakMore.addEventListener('click', () => {
+      document.querySelectorAll('[data-extra-weak]').forEach((row) => {
+        row.hidden = false;
+      });
+      showWeakMore.hidden = true;
+      const panel = showWeakMore.closest('[data-analysis-panel]');
+      const select = panel ? panel.querySelector('[data-detail-category-filter]') : null;
+      if (select) applyDetailCategoryFilter(select);
+    });
+  }
+
+  function applyDetailCategoryFilter(select) {
+    const panel = select.closest('[data-analysis-panel], [data-practice-analysis-panel]');
+    if (!panel) return;
+    const selected = select.value || 'all';
+    const rows = Array.from(panel.querySelectorAll('[data-detail-category]'));
+    const showMore = panel.querySelector('[data-show-review-more]');
+    const reviewExpanded = showMore ? showMore.hidden : true;
+    const weakShowMore = panel.querySelector('[data-show-weak-more]');
+    const weakExpanded = weakShowMore ? weakShowMore.hidden : true;
+    let visibleCount = 0;
+    rows.forEach((row) => {
+      const matches = selected === 'all' || row.dataset.detailCategory === selected;
+      if (row.matches('[data-extra-review]')) {
+        row.hidden = selected === 'all' && !reviewExpanded;
+      }
+      if (row.matches('[data-extra-weak]')) {
+        row.hidden = selected === 'all' && !weakExpanded;
+      }
+      row.dataset.categoryFiltered = matches ? '0' : '1';
+      row.style.display = matches ? '' : 'none';
+      if (matches && !row.hidden) visibleCount += 1;
+    });
+    const empty = panel.querySelector('[data-category-empty]');
+    if (empty) {
+      empty.hidden = visibleCount > 0;
+    }
+  }
+
+  document.querySelectorAll('[data-detail-category-filter]').forEach((select) => {
+    select.addEventListener('change', () => applyDetailCategoryFilter(select));
+    applyDetailCategoryFilter(select);
+  });
 
   document.querySelectorAll('[data-practice-category-sort]').forEach((select) => {
     select.addEventListener('change', () => {

@@ -12,12 +12,12 @@
     #card-inner { transform-origin: center; }
   </style>
 
-  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+  <section class="flashcard-toolbar rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex flex-wrap items-center gap-3">
-        <a href="{{ url_for('flashcard_settings') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">← 一覧に戻る</a>
+        <a href="{{ url_for('flashcard_settings') }}" class="flashcard-back-button inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">← 一覧に戻る</a>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
         <div class="direction-toggle">
           <button type="button" data-direction="meaning_to_term" class="direction-btn">意味→単語</button>
           <button type="button" data-direction="term_to_meaning" class="direction-btn">単語→意味</button>
@@ -28,40 +28,40 @@
         <div class="h-2 w-36 overflow-hidden rounded-full bg-slate-200">
           <div id="card-progress" class="h-full rounded-full bg-emerald-600" style="width: 0%"></div>
         </div>
-        <a href="{{ url_for('flashcard_settings') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" aria-label="設定">⚙</a>
+        <a href="{{ url_for('flashcard_settings') }}" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" aria-label="設定">⚙</a>
       </div>
     </div>
   </section>
 
-  <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
-      <div id="idle-message" class="mb-5 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+  <div class="flashcard-layout mt-4 grid gap-4">
+    <section class="flashcard-study-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+      <div id="idle-message" class="mb-3 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800">
         一定時間操作がなかったため、学習時間の計測を一時停止しています。
       </div>
-      <div class="grid items-center gap-5 md:grid-cols-[56px_minmax(0,1fr)_56px]">
+      <div class="grid items-center gap-4 md:grid-cols-[48px_minmax(0,1fr)_48px]">
         <button id="prev-btn" class="nav-circle" aria-label="前のカード">‹</button>
 
-        <div id="card-area" class="flex min-h-[440px] items-center justify-center">
-          <div id="flashcard" class="relative h-[26rem] w-full max-w-3xl perspective cursor-pointer">
+        <div id="card-area" class="flashcard-area flex items-center justify-center">
+          <div id="flashcard" class="relative h-[22rem] w-full max-w-3xl perspective cursor-pointer">
             <div id="card-inner" class="absolute inset-0 transition-transform duration-500 preserve-3d">
-              <div id="card-front" class="absolute inset-0 flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-8 shadow-sm backface-hidden">
+              <div id="card-front" class="absolute inset-0 flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm backface-hidden">
                 <div class="flex justify-start">
                   <span class="rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700">表面</span>
                 </div>
                 <div class="text-center">
                   <p class="text-sm font-bold text-slate-500">Q.</p>
-                  <div id="card-description" class="mt-3 text-2xl font-bold leading-10 text-slate-950"></div>
+                  <div id="card-description" class="mt-3 text-[1.35rem] font-bold leading-9 text-slate-950"></div>
                 </div>
                 <div class="text-center text-sm font-semibold text-slate-400">クリック / Space / Enter で答えを表示</div>
               </div>
 
-              <div id="card-back" class="absolute inset-0 flex rotate-y-180 transform flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-8 shadow-sm backface-hidden">
+              <div id="card-back" class="absolute inset-0 flex rotate-y-180 transform flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm backface-hidden">
                 <div class="flex justify-start">
                   <span class="rounded-full bg-white px-4 py-2 text-xs font-bold text-emerald-700">裏面</span>
                 </div>
                 <div class="text-center">
-                  <div id="card-term" class="text-4xl font-bold text-emerald-800"></div>
-                  <div id="card-category" class="mt-5 text-sm font-bold text-emerald-700"></div>
+                  <div id="card-term" class="text-3xl font-bold text-emerald-800"></div>
+                  <div id="card-category" class="mt-4 text-sm font-bold text-emerald-700"></div>
                 </div>
                 <div class="text-center text-sm font-semibold text-emerald-700">クリック / Space / Enter で次へ</div>
               </div>
@@ -72,13 +72,13 @@
         <button id="next-btn" class="nav-circle" aria-label="次のカード">›</button>
       </div>
 
-      <div class="mt-5 grid gap-3 md:grid-cols-3">
+      <div class="mt-3 grid gap-3 md:grid-cols-3">
         <button data-status="理解済み" data-key="1" class="status-btn answer-btn answer-green"><span class="keycap">1</span>わかった</button>
         <button data-status="あいまい" data-key="2" class="status-btn answer-btn answer-amber"><span class="keycap">2</span>あいまい</button>
         <button data-status="未理解" data-key="3" class="status-btn answer-btn answer-rose"><span class="keycap">3</span>わからなかった</button>
       </div>
 
-      <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold leading-6 text-slate-600">
+      <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold leading-5 text-slate-600">
         キーボード: <span class="shortcut-key">Space</span>/<span class="shortcut-key">Enter</span> 表示・次へ　
         <span class="shortcut-key">1</span> わかった　
         <span class="shortcut-key">2</span> あいまい　
@@ -87,9 +87,9 @@
       </div>
     </section>
 
-    <aside class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+    <aside class="flashcard-side rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
       <h2 class="text-sm font-bold text-slate-950">学習データ</h2>
-      <div class="mt-5 space-y-3">
+      <div class="mt-3 space-y-2">
         <div class="data-card">
           <span class="data-mark data-green">✓</span>
           <span>今日の学習</span>
@@ -107,7 +107,7 @@
         </div>
       </div>
 
-      <div class="mt-7 border-t border-emerald-100 pt-5">
+      <div class="mt-4 border-t border-emerald-100 pt-3">
         <h3 class="text-xs font-bold text-slate-500">ショートカット</h3>
         <button id="pause-btn" type="button" class="side-action mt-3">一時停止</button>
         <label class="side-action mt-2 cursor-pointer">
@@ -116,9 +116,9 @@
         </label>
       </div>
 
-      <div class="mt-7 border-t border-emerald-100 pt-5">
+      <div class="mt-4 border-t border-emerald-100 pt-3">
         <p class="text-xs font-bold text-slate-500">今回の範囲</p>
-        <p class="mt-2 text-sm font-bold leading-6 text-slate-800">
+        <p class="mt-2 text-xs font-bold leading-5 text-slate-800">
           {% if status %}{{ status }}{% elif category %}{{ category }}{% elif big_category %}{{ big_category }}{% else %}すべての用語{% endif %}
         </p>
       </div>
@@ -127,17 +127,37 @@
 </div>
 
 <style>
+  .flashcard-back-button {
+    min-width: 132px;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+  .flashcard-layout {
+    grid-template-columns: minmax(0, 1fr) 224px;
+    align-items: stretch;
+  }
+  .flashcard-study-panel {
+    min-height: 0;
+  }
+  .flashcard-area {
+    height: min(23.25rem, calc(100vh - 304px));
+    min-height: 330px;
+  }
+  #flashcard {
+    height: 100%;
+    min-height: 19.5rem;
+  }
   .nav-circle {
     display: inline-flex;
-    height: 46px;
-    width: 46px;
+    height: 42px;
+    width: 42px;
     align-items: center;
     justify-content: center;
     border-radius: 999px;
     border: 1px solid #e2e8f0;
     background: #fff;
     color: #0f172a;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 700;
     box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
     transition: background 160ms ease, transform 160ms ease;
@@ -148,10 +168,10 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 56px;
+    min-height: 48px;
     border-radius: 14px;
     border: 1px solid transparent;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
   }
   .answer-rose { border-color: #fecdd3; background: #fff1f2; color: #e11d48; }
@@ -169,8 +189,8 @@
     font-weight: 900;
   }
   .keycap {
-    height: 28px;
-    min-width: 28px;
+    height: 26px;
+    min-width: 26px;
     padding: 0 8px;
     font-size: 13px;
   }
@@ -187,22 +207,27 @@
     align-items: center;
     border-radius: 14px;
     background: rgba(255,255,255,.72);
-    padding: 14px;
+    padding: 11px 12px;
     font-size: 12px;
     font-weight: 800;
     color: #64748b;
   }
   .data-card strong {
     grid-column: 2;
-    font-size: 22px;
+    font-size: 19px;
     line-height: 1;
     color: #0f172a;
+  }
+  .flashcard-side {
+    height: 100%;
+    max-height: calc(100vh - 178px);
+    overflow: hidden;
   }
   .data-mark {
     grid-row: span 2;
     display: inline-flex;
-    height: 28px;
-    width: 28px;
+    height: 26px;
+    width: 26px;
     align-items: center;
     justify-content: center;
     border-radius: 999px;
@@ -214,7 +239,7 @@
   .data-rose { background: #ffe4e6; color: #e11d48; }
   .side-action {
     display: flex;
-    min-height: 42px;
+    min-height: 38px;
     width: 100%;
     align-items: center;
     gap: 10px;
@@ -235,7 +260,7 @@
   }
   .direction-btn {
     border-radius: 10px;
-    padding: 8px 12px;
+    padding: 7px 11px;
     font-size: 12px;
     font-weight: 800;
     color: #64748b;
@@ -244,6 +269,59 @@
     background: #fff;
     color: #047857;
     box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+  }
+  @media (max-height: 820px) {
+    .flashcard-toolbar {
+      padding: 12px;
+    }
+    .flashcard-area {
+      height: min(21rem, calc(100vh - 282px));
+      min-height: 300px;
+    }
+    #flashcard {
+      min-height: 18rem;
+    }
+    #card-front,
+    #card-back {
+      padding: 1.125rem;
+    }
+    #card-description {
+      font-size: 1.2rem;
+      line-height: 1.85rem;
+    }
+    #card-term {
+      font-size: 1.65rem;
+    }
+    .answer-btn {
+      min-height: 44px;
+    }
+    .flashcard-side {
+      padding: 12px;
+    }
+    .data-card {
+      padding: 9px 10px;
+    }
+    .side-action {
+      min-height: 34px;
+      padding: 7px 10px;
+    }
+  }
+  @media (max-width: 1120px) {
+    .flashcard-layout {
+      grid-template-columns: minmax(0, 1fr) 206px;
+    }
+    .flashcard-side {
+      padding: 10px;
+    }
+  }
+  @media (max-width: 860px) {
+    .flashcard-layout {
+      grid-template-columns: 1fr;
+    }
+    .flashcard-side {
+      max-height: none;
+      overflow: visible;
+    }
   }
 </style>
 

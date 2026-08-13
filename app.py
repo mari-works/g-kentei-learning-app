@@ -1127,6 +1127,160 @@ def format_history_duration(seconds):
     return f"{minutes}分"
 
 
+def has_completed_daily_term_recommendation(db_path, user_id, today=None):
+    today = today or datetime.now().date()
+    row = query_db(
+        db_path,
+        """
+        SELECT COUNT(*) AS count
+        FROM history
+        WHERE user_id = ?
+          AND session_type = 'term'
+          AND learning_type = 'vocabulary'
+          AND learning_mode = 'daily_recommendation'
+          AND DATE(created_at) = ?
+          AND (amount > 0 OR duration_seconds > 0)
+        """,
+        (user_id, today.isoformat()),
+        one=True,
+    )
+    return bool(row and row["count"])
+
+
+def build_daily_term_recommendation(db_path, user_id, today=None, term_goal=None):
+    today = today or datetime.now().date()
+    today_key = today.isoformat()
+    term_goal = term_goal or 10
+    valid_limit = term_goal if term_goal in {10, 20, 30, 50} else 20
+    rng = random.Random(f"{user_id}:{today_key}:daily_term_recommendation")
+
+    category_rows = query_db(
+        db_path,
+        """
+        SELECT keywords.category,
+               COUNT(*) AS total,
+               SUM(CASE WHEN COALESCE(kp.learning_status, '未学習') = '理解済み' THEN 1 ELSE 0 END) AS understood,
+               SUM(CASE WHEN COALESCE(kp.learning_status, '未学習') = 'あいまい' THEN 1 ELSE 0 END) AS ambiguous,
+               SUM(CASE WHEN COALESCE(kp.learning_status, '未学習') IN ('未理解', '未学習') THEN 1 ELSE 0 END) AS weak
+        FROM keywords
+        LEFT JOIN keyword_progress kp ON kp.keyword_id = keywords.id AND kp.user_id = ?
+        GROUP BY keywords.category
+        ORDER BY keywords.category
+        """,
+        (user_id,),
+    )
+    category_names = [row["category"] for row in category_rows if row["category"]]
+    beginner_priority = ["AIの基礎", "機械学習", "ディープラーニングの概要", "数学・統計", "AIの社会実装に向けて"]
+    beginner_candidates = [name for name in beginner_priority if name in category_names] or category_names[:6] or ["AIの基礎"]
+    beginner_category = rng.choice(beginner_candidates)
+    completed_today = has_completed_daily_term_recommendation(db_path, user_id, today)
+
+    practice_answer_count = query_db(
+        db_path,
+        "SELECT COUNT(*) AS count FROM history WHERE user_id = ? AND session_type = 'practice' AND correct IS NOT NULL",
+        (user_id,),
+        one=True,
+    )["count"]
+    studied_category_count = query_db(
+        db_path,
+        "SELECT COUNT(DISTINCT category) AS count FROM history WHERE user_id = ? AND category IS NOT NULL AND (amount > 0 OR duration_seconds > 0)",
+        (user_id,),
+        one=True,
+    )["count"]
+    has_enough_history = practice_answer_count >= 30 and studied_category_count >= 3
+
+    completed_term = None
+    if completed_today:
+        completed_term = query_db(
+            db_path,
+            """
+            SELECT keywords.*,
+                   COALESCE(kp.learning_status, '未学習') AS learning_status,
+                   kp.last_studied_at AS last_studied_at
+            FROM history h
+            JOIN keywords ON keywords.id = h.item_id
+            LEFT JOIN keyword_progress kp ON kp.keyword_id = keywords.id AND kp.user_id = h.user_id
+            WHERE h.user_id = ?
+              AND h.session_type = 'term'
+              AND h.learning_type = 'vocabulary'
+              AND h.learning_mode = 'daily_recommendation'
+              AND DATE(h.created_at) = ?
+            ORDER BY h.created_at
+            LIMIT 1
+            """,
+            (user_id, today_key),
+            one=True,
+        )
+
+    if completed_term:
+        recommended_term = dict(completed_term)
+    else:
+        term_candidates = query_db(
+            db_path,
+            """
+            SELECT keywords.*,
+                   COALESCE(kp.learning_status, '未学習') AS learning_status,
+                   kp.last_studied_at AS last_studied_at
+            FROM keywords
+            LEFT JOIN keyword_progress kp ON kp.keyword_id = keywords.id AND kp.user_id = ?
+            WHERE COALESCE(kp.learning_status, '未学習') IN ('未理解', 'あいまい', '未学習')
+            ORDER BY
+              CASE COALESCE(kp.learning_status, '未学習')
+                WHEN '未理解' THEN 0
+                WHEN 'あいまい' THEN 1
+                ELSE 2
+              END,
+              kp.last_studied_at IS NOT NULL,
+              kp.last_studied_at,
+              keywords.keyword
+            LIMIT 20
+            """,
+            (user_id,),
+        )
+        term_pool = [dict(row) for row in term_candidates]
+        if has_enough_history and term_pool:
+            recommended_term = rng.choice(term_pool[: min(8, len(term_pool))])
+        else:
+            beginner_terms = get_keywords(db_path, category=beginner_category, user_id=user_id)
+            recommended_term = dict(rng.choice(beginner_terms)) if beginner_terms else (term_pool[0] if term_pool else None)
+
+    days_ago = None
+    if recommended_term and recommended_term.get("last_studied_at"):
+        reviewed_at = parse_iso_datetime(recommended_term["last_studied_at"])
+        days_ago = (today - reviewed_at.date()).days if reviewed_at else None
+
+    keyword = recommended_term["keyword"] if recommended_term else "未理解の用語"
+    category = recommended_term["category"] if recommended_term else beginner_category
+    status = recommended_term.get("learning_status") if recommended_term else None
+    reason = (
+        "基本カテゴリから日替わりで選びました"
+        if not has_enough_history
+        else f"{days_ago}日以上復習していません"
+        if days_ago is not None and days_ago >= 1
+        else "理解度が低い用語から復習しましょう"
+    )
+
+    return {
+        "keyword": keyword,
+        "category": category,
+        "status": status,
+        "reason": reason,
+        "goal": term_goal,
+        "completed_today": completed_today,
+        "button_label": "もう一度解く" if completed_today else "用語学習を始める",
+        "settings_button_label": "もう一度解く" if completed_today else "今すぐ復習する",
+        "url": url_for(
+            "flashcards",
+            category=category,
+            status=status,
+            limit=valid_limit,
+            random=1,
+            direction="term_to_meaning",
+            learning_mode="daily_recommendation",
+        ),
+    }
+
+
 def build_quiz_summary(state):
     if not state:
         return {
@@ -1542,42 +1696,6 @@ def home():
     beginner_candidates = [name for name in beginner_priority if name in beginner_categories] or beginner_categories[:6] or ["AIの基礎"]
     beginner_category = rng.choice(beginner_candidates)
 
-    term_candidates = query_db(
-        db_path,
-        """
-        SELECT keywords.*,
-               COALESCE(kp.learning_status, '未学習') AS learning_status,
-               kp.last_studied_at AS last_studied_at
-        FROM keywords
-        LEFT JOIN keyword_progress kp ON kp.keyword_id = keywords.id AND kp.user_id = ?
-        WHERE COALESCE(kp.learning_status, '未学習') IN ('未理解', 'あいまい', '未学習')
-        ORDER BY
-          CASE COALESCE(kp.learning_status, '未学習')
-            WHEN '未理解' THEN 0
-            WHEN 'あいまい' THEN 1
-            ELSE 2
-          END,
-          kp.last_studied_at IS NOT NULL,
-          kp.last_studied_at,
-          keyword
-        LIMIT 20
-        """,
-        (user_id,),
-    )
-    term_pool = [dict(row) for row in term_candidates]
-    if has_enough_history and term_pool:
-        recommended_term = rng.choice(term_pool[: min(8, len(term_pool))])
-    else:
-        beginner_terms = get_keywords(db_path, category=beginner_category, user_id=user_id)
-        recommended_term = dict(rng.choice(beginner_terms)) if beginner_terms else (term_pool[0] if term_pool else None)
-    if recommended_term and recommended_term.get("last_studied_at"):
-        try:
-            term_days_ago = (today - datetime.fromisoformat(recommended_term["last_studied_at"]).date()).days
-        except ValueError:
-            term_days_ago = None
-    else:
-        term_days_ago = None
-
     resume_state = session.get("quiz") if isinstance(session.get("quiz"), dict) else None
     resume_card = None
     if resume_state and resume_state.get("user_id") == user_id and resume_state.get("questions") and not resume_state.get("completed"):
@@ -1629,28 +1747,7 @@ def home():
 
     term_goal = current_user.daily_term_goal or 10
     question_goal = current_user.daily_question_goal or 10
-    term_recommendation = {
-        "keyword": recommended_term["keyword"] if recommended_term else "未理解の用語",
-        "category": recommended_term["category"] if recommended_term else beginner_category,
-        "reason": (
-            "基本カテゴリから日替わりで選びました"
-            if not has_enough_history
-            else
-            f"{term_days_ago}日以上復習していません"
-            if term_days_ago is not None and term_days_ago >= 1
-            else "理解度が低い用語から復習しましょう"
-        ),
-        "goal": term_goal,
-        "url": url_for(
-            "flashcards",
-            category=recommended_term["category"] if recommended_term else beginner_category,
-            status=None if not recommended_term else recommended_term.get("learning_status"),
-            limit=term_goal if term_goal in {10, 20, 30, 50} else 20,
-            random=1,
-            direction="term_to_meaning",
-            learning_mode="daily_recommendation",
-        ),
-    }
+    term_recommendation = build_daily_term_recommendation(db_path, user_id, today, term_goal)
     practice_recommendation = {
         "category": recommended_category["name"],
         "rate": recommended_category.get("practice_rate"),
@@ -1801,6 +1898,12 @@ def flashcard_settings():
         status_items=status_items,
         total_terms=dashboard["total"],
         dashboard=dashboard,
+        term_recommendation=build_daily_term_recommendation(
+            app.config["DATABASE"],
+            user_id,
+            datetime.now().date(),
+            current_user.daily_term_goal or 10,
+        ),
         selected_step=selected_step,
         selected_big_category=selected_big_category,
         selected_category=selected_category,
@@ -2011,6 +2114,8 @@ def practice_settings():
     if not mode or mode not in ["normal", "random", "category", "wrong", "review", "exam"]:
         return redirect(url_for("practice"))
 
+    db_path = app.config["DATABASE"]
+    user_id = current_user_id()
     categories = get_quiz_categories()
     mode_label = "通常演習モード" if mode == "normal" else get_mode_label(mode)
     mode_description = (
@@ -2018,6 +2123,76 @@ def practice_settings():
         if mode == "normal"
         else get_mode_description(mode)
     )
+    normal_recommendation = None
+    normal_resume_card = None
+    if mode == "normal":
+        question_goal = current_user.daily_question_goal or 10
+        practice_rows = query_db(
+            db_path,
+            """
+            SELECT COALESCE(category, '未分類') AS category,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN correct = 1 THEN 1 ELSE 0 END) AS correct_count
+            FROM history
+            WHERE user_id = ?
+              AND session_type = 'practice'
+              AND COALESCE(practice_mode, 'normal') != 'exam'
+              AND category IS NOT NULL
+              AND correct IS NOT NULL
+            GROUP BY COALESCE(category, '未分類')
+            """,
+            (user_id,),
+        )
+        practiced = {row["category"]: row for row in practice_rows}
+        category_candidates = []
+        for category_name in categories:
+            stats = practiced.get(category_name)
+            total = stats["total"] if stats else 0
+            correct_count = stats["correct_count"] if stats else 0
+            rate = int((correct_count / total) * 100) if total else None
+            score = (100 - rate) if rate is not None else 55
+            if total == 0:
+                score += 12
+            category_candidates.append({"name": category_name, "rate": rate, "score": score, "total": total})
+        today_key = datetime.now().date().isoformat()
+        rng = random.Random(f"{user_id}:{today_key}:practice_recommendation")
+        category_candidates.sort(key=lambda item: (-item["score"], item["name"]))
+        recommendation_pool = category_candidates[: min(6, len(category_candidates))] or [{"name": "ランダム", "rate": None, "score": 0, "total": 0}]
+        recommended_category = rng.choice(recommendation_pool)
+        normal_recommendation = {
+            "category": recommended_category["name"],
+            "rate": recommended_category["rate"],
+            "goal": question_goal,
+            "reason": (
+                "まだ演習データが少ないカテゴリです。まずは短く解いてみましょう。"
+                if recommended_category["rate"] is None
+                else f"正答率が{recommended_category['rate']}%のカテゴリを重点的に演習しましょう。"
+            ),
+            "url": url_for("practice_quiz", mode="category", category=recommended_category["name"], limit=question_goal, start=1, reset=1),
+        }
+
+        resume_state = session.get("quiz") if isinstance(session.get("quiz"), dict) else None
+        if (
+            resume_state
+            and resume_state.get("user_id") == user_id
+            and resume_state.get("mode") != "exam"
+            and resume_state.get("questions")
+            and not resume_state.get("completed")
+        ):
+            answered = sum(1 for answer in resume_state.get("answers", []) if answer.get("selected_choice") is not None)
+            total = len(resume_state.get("questions", []))
+            if answered > 0:
+                normal_resume_card = {
+                    "answered": answered,
+                    "total": total,
+                    "rate": int((answered / total) * 100) if total else 0,
+                    "url": url_for(
+                        "practice_quiz",
+                        mode=resume_state.get("mode") or "random",
+                        category=resume_state.get("category") or "",
+                        limit=resume_state.get("question_limit") or "",
+                    ),
+                }
 
     return render_template(
         "practice_settings.html",
@@ -2027,6 +2202,8 @@ def practice_settings():
         categories=categories,
         exam_types=EXAM_TYPES,
         paused_exam=get_paused_exam(session),
+        normal_recommendation=normal_recommendation,
+        normal_resume_card=normal_resume_card,
     )
 
 
