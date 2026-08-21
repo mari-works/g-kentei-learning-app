@@ -7,20 +7,16 @@ echo G-Kentei Learning App - Initial Setup
 echo ==========================================
 echo.
 
-where py >nul 2>&1
-if %errorlevel%==0 (
-    set "PYTHON_CMD=py"
+rem The required packages need Python 3.10 or newer.
+py -3.11 --version >nul 2>&1
+if not errorlevel 1 (
+    set "PYTHON_CMD=py -3.11"
 ) else (
-    where python >nul 2>&1
-    if %errorlevel%==0 (
-        set "PYTHON_CMD=python"
-    ) else (
-        echo ERROR: Python was not found.
-        echo Install Python and enable "Add python.exe to PATH".
-        echo.
-        pause
-        exit /b 1
-    )
+    echo ERROR: Python 3.11 was not found.
+    echo Install Python 3.11, then run this file again.
+    echo.
+    pause
+    exit /b 1
 )
 
 if not exist "requirements.txt" (
@@ -31,7 +27,21 @@ if not exist "requirements.txt" (
     exit /b 1
 )
 
-if not exist "venv\Scripts\python.exe" (
+if exist "venv\Scripts\python.exe" (
+    "venv\Scripts\python.exe" -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
+    if errorlevel 1 (
+        echo Existing virtual environment uses an unsupported Python version.
+        echo Recreating it with Python 3.11...
+        %PYTHON_CMD% -m venv --clear venv
+        if errorlevel 1 (
+            echo ERROR: Failed to recreate virtual environment.
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo Existing compatible virtual environment found.
+    )
+) else (
     echo Creating virtual environment...
     %PYTHON_CMD% -m venv venv
     if errorlevel 1 (
@@ -39,8 +49,6 @@ if not exist "venv\Scripts\python.exe" (
         pause
         exit /b 1
     )
-) else (
-    echo Existing virtual environment found.
 )
 
 echo.
